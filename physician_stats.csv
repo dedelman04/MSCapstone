@@ -1,0 +1,4 @@
+Category,primary_care_physician,Means,,StdDev,Min,Max,ValidObs
+heart_disease_mortality_per_100k for primary_care_physician=< 1500,< 1500,253.4179457,250,51.87111286,109,420,847
+heart_disease_mortality_per_100k for primary_care_physician=1500-2499,1500-2499,285.9113043,279,56.38084591,114,512,1150
+heart_disease_mortality_per_100k for primary_care_physician=2500+,2500+,300.8146241,299,56.62683631,149,483,971

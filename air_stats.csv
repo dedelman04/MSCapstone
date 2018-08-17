@@ -1,0 +1,6 @@
+Category,air_pollution,Mean,Median,StdDev,Min,Max,ValidObs,,,,
+heart_disease_mortality_per_100k for air_pollution=<= 10,<= 10,275,268.5,56.31110446,125,455,836,,,,
+heart_disease_mortality_per_100k for air_pollution=11,11,261,252,57.3929602,114,512,548,,,,268.5 252.0 272.0 287.0 299.0
+heart_disease_mortality_per_100k for air_pollution=12,12,280,272,61.05140533,109,468,650,,,,
+heart_disease_mortality_per_100k for air_pollution=13,13,288,287,59.24087099,129,483,850,,,,
+heart_disease_mortality_per_100k for air_pollution=14+,14+,303,299,50.35023307,155,450,286,,,,

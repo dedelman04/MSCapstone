@@ -1,0 +1,6 @@
+Category,Population,Mean,Median,StdDev,Min,Max,ValidObs,,,
+heart_disease_mortality_per_100k for population=under 2.5K,under 2.5K,272,265,64.85726683,109,512,722,,282.194,277.75
+heart_disease_mortality_per_100k for population=2.5-20K,2.5-20K,296,291,60.15995765,149,483,1026,,276.606,272.25
+heart_disease_mortality_per_100k for population=20-250k,20-250k,279,280,54.1150282,151,466,644,,,
+heart_disease_mortality_per_100k for population=250K-1M,250K-1M,269,266,46.75534313,175,401,370,,,
+heart_disease_mortality_per_100k for population=1M+,1M+,257,253,50.45475132,155,393,436,,,

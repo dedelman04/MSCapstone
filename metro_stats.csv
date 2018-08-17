@@ -1,0 +1,3 @@
+Category,metro,Means,Median,StdDev,Min,Max,ValidObs
+heart_disease_mortality_per_100k for metro=Metro,Metro,266,261,50.42950079,151,409,1128
+heart_disease_mortality_per_100k for metro=Non-Metro,Non-Metro,286,282,61.95784389,109,512,2070

@@ -1,0 +1,6 @@
+Category,dentist,Means,,StdDev,Min,Max,ValidObs,,,
+heart_disease_mortality_per_100k for dentist=< 1500,< 1500,241.6791045,238.5,50.36741823,135,512,402,,,238.5 260.0 282.0 307.0 308.0
+heart_disease_mortality_per_100k for dentist=1500-2499,1500-2499,268.3466523,260,52.17477618,114,444,926,,,
+heart_disease_mortality_per_100k for dentist=2500-3499,2500-3499,283.4333868,282,54.82056356,178,466,623,,,
+heart_disease_mortality_per_100k for dentist=3500-4499,3500-4499,305.8717949,307,52.16800006,168,459,390,,,
+heart_disease_mortality_per_100k for dentist=4500+,4500+,308.4584013,308,56.71123088,155,483,613,,,

@@ -1,0 +1,13 @@
+demo_pct_non_hispanic_afr_amer .375  s
+demo_pct_adults_less_than_hs .527
+demo_pct_adults_with_HS .428
+demo_pct_adults_with_some_college (-.341)
+demo_pct_adults_bachelors_or_greater (-.541)
+econ_pct_civilian_labor (-.477)
+health-pct_adult_obesity .594  s
+health_pct_adult_smoking .497  s
+health_pct_diabetes .632   s
+health_pct_low_birthweight (l) .477  s
+health_pct_physical_inactivity .65  s
+health_homicides_per_100 (l) - lots of missing (about 1/3)
+p_*  s
