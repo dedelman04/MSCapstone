@@ -1,3 +1,6 @@
+library(tidyverse)
+library(data.table)
+library(ggplot2)
 
 ###BEGIN DATA LOAD WORK
 #######################
@@ -25,13 +28,13 @@ high_mort <- as.integer(max(train_data$heart_disease_mortality_per_100k))
 
 train_data <- train_data %>% mutate(metro = ifelse(like(area__rucc, "Nonmetro"), "Nonmetro", "Metro"))
 
-train_data <- train_data %>% mutate(population = ifelse(like(train_data$area__rucc, "19,999"),"2.5-20k",
-                                                    ifelse(like(train_data$area__rucc, "less than 2,500"), "under 2.5k",
-                                                    ifelse(like(train_data$area__rucc, "20,000"), "20-250k",
-                                                    ifelse(like(train_data$area__rucc, "fewer than 250,000"), "20-250k",
-                                                    ifelse(like(train_data$area__rucc, "250,000"), "250k-1M",
-                                                           "1M+"))))))
-
+train_data <- train_data %>% 
+  mutate(population = ifelse(like(train_data$area__rucc, "19,999"),"2.5-20k",
+                             ifelse(like(train_data$area__rucc, "less than 2,500"), "under 2.5k",
+                                    ifelse(like(train_data$area__rucc, "20,000"), "20-250k",
+                                           ifelse(like(train_data$area__rucc, "fewer than 250,000"), "20-250k", ##same group
+                                                  ifelse(like(train_data$area__rucc, "250,000"), "250k-1M",
+                                                         "1M+"))))))
 
 train_data$population <- factor(train_data$population, 
                                 levels=c("under 2.5k", "2.5-20k", "20-250k", "250k-1M", "1M+"))
@@ -76,6 +79,20 @@ hd_mean = mean(train_data$heart_disease_mortality_per_100k)
 hd_med = median(train_data$heart_disease_mortality_per_100k)
 ######################
 ###END Data Load Work
+
+#Historgram & boxplot
+train_data %>% ggplot(aes(x=heart_disease_mortality_per_100k))+geom_histogram(bins=40)+
+  xlab("heart_mort_100k")+
+  geom_vline(linetype = "dashed", color = "purple", xintercept = hd_med)+
+  geom_vline(linetype = "dashed", color = "blue", xintercept = hd_mean)+
+  annotate("text", x=hd_mean+20, y=250, label="<- mean", size=3, color = "blue")+
+  annotate("text", x=hd_med-20, y=250, label="median ->", size=3, color = "purple")  
+
+train_data %>% ggplot(aes(y=heart_disease_mortality_per_100k))+geom_boxplot()+
+  geom_hline(linetype = "dashed", color = "blue", yintercept = hd_mean)+
+  theme(axis.text.x=element_blank())
+
+  
 
 #write.csv(train_data, file="train_factor.csv", sep=",", row.names=FALSE)
 
@@ -226,6 +243,25 @@ plot <- plot + annotate("text", x=6.5, y=hd_med-30, label="median", size=3, colo
 
 plot
 
+train_data %>% ggplot(aes(x=heart_disease_mortality_per_100k))+
+  xlab("heart_mort_100k")+
+  geom_histogram(binwidth = (high_mort-low_mort)/50)+
+  facet_wrap(~ econ__economic_typology, ncol = 3)+
+  geom_vline(linetype="dashed", xintercept = hd_mean, color = "blue")+
+  geom_vline(linetype="dashed", xintercept = hd_med, color = "red")+
+  annotate("text", x=hd_mean+40, y=100, label="<- mean", size=2.5, color = "blue")+
+  annotate("text", x=hd_med-40, y=100, label="median ->", size=2.5, color = "red")
+
+#Box plot by economic type
+train_data %>% ggplot(aes(x=econ__economic_typology, y=heart_disease_mortality_per_100k))+
+  geom_boxplot() + 
+  geom_hline(linetype="dashed", yintercept = hd_mean, color = "blue")+xlab("")+
+  geom_hline(linetype="dashed", yintercept = hd_med, color = "red")+
+  theme(axis.text.x = element_text(angle = 45, hjust=1, vjust=1)) + 
+  ggtitle("Economic Typology")+theme(plot.title = element_text(hjust=0.5))+
+  annotate("text", x=.5, y=hd_mean+30, label="mean", size=3, color = "blue", angle=90)+
+  annotate("text", x=6.5, y=hd_med-30, label="median", size=3, color = "red", angle=90)
+
 #Summary for typology
 econ <- rxSummary(data=train_data, heart_disease_mortality_per_100k ~ econ__economic_typology)
 econ.df <- econ$categorical[[1]]
@@ -281,6 +317,15 @@ plot <- plot+geom_vline(linetype="dashed", xintercept = hd_med, color = "red")
 plot <- plot + annotate("text", x=hd_mean+40, y=55, label="<- mean", size=2.5, color = "blue")
 plot <- plot + annotate("text", x=hd_med-40, y=55, label="median ->", size=2.5, color = "red")
 plot
+
+lvl <- levels(train_data$area__rucc)
+pop_lvl <- c("1M+", "250k-1M", "20-250K", "under 2,500", "under 2,500", "2.5-20K", "2.5-20k", "20-250K", "20-250K")
+
+rucc_tab <- data.frame(x=lvl, y=pop_lvl)
+
+library(gridExtra)
+library(grid)
+grid.table(rucc_tab)
 
 #Box plot by area/population type
 plot <- ggplot(train_data,

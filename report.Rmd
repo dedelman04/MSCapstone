@@ -1,0 +1,207 @@
+---
+title: "Predicting Heart Disease Mortality"
+author: "David Edelman"
+date: "February 28, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(data.table)
+library(ggplot2)
+train_df <- read.csv("C:/users/dedelman/desktop/capstone/train_values.csv",
+                  header=TRUE,
+                  stringsAsFactors = TRUE)
+
+train_label <- read.csv("C:/users/dedelman/desktop/capstone/train_labels.csv",
+                        header=TRUE,
+                        stringsAsFactors = TRUE)
+
+train_data <- merge(x=train_df, y=train_label, by="row_id")
+
+low_mort <- as.integer(min(train_data$heart_disease_mortality_per_100k))
+high_mort <- as.integer(max(train_data$heart_disease_mortality_per_100k))
+hd_mean = mean(train_data$heart_disease_mortality_per_100k)
+hd_med = median(train_data$heart_disease_mortality_per_100k)
+
+train_data <- train_data %>% mutate(metro = ifelse(like(area__rucc, "Nonmetro"), "Nonmetro", "Metro"))
+
+train_data <- train_data %>% 
+  mutate(population = ifelse(like(train_data$area__rucc, "19,999"),"2.5-20k",
+                             ifelse(like(train_data$area__rucc, "less than 2,500"), "under 2.5k",
+                                    ifelse(like(train_data$area__rucc, "20,000"), "20-250k",
+                                           ifelse(like(train_data$area__rucc, "fewer than 250,000"), "20-250k", ##same group
+                                                  ifelse(like(train_data$area__rucc, "250,000"), "250k-1M",
+                                                         "1M+"))))))
+
+train_data$population <- factor(train_data$population, 
+                                levels=c("under 2.5k", "2.5-20k", "20-250k", "250k-1M", "1M+"))
+
+levels(train_data$area__rucc) <- c("Metro - 1 Million +",
+                                  "Metro - 250,000 to 1 Mil",
+                                  "Metro - less than 250,000",
+                                  "Nonmetro - Rural or < 2.5k, adjacent",
+                                  "Nonmetro - Rural or < 2.5k, non-adjacent",
+                                  "Nonmetro - 2,500 to 19,999, adjacent",
+                                  "Nonmetro - 2,500 to 19,999, non-adjacent",
+                                  "Nonmetro - 20,000 or more, adjacent",
+                                  "Nonmetro - 20,000 or more, non-adjacent"
+                                  )
+
+```
+
+## Executive Summary
+Heart disease is one of the leading causes of death in the United States. This document presents an analysis of county-by-county heart disease mortality rates (per 100,000 individuals) and uses various demographic statistics to build a model that predicts the heart disease mortality rate for that county
+
+The given data set, containing known heart disease mortality rates, comprises 3198 observations, representing 1599 counties and data collected over two separate years.  Both categorical and numeric data are present in the feature set, and after some initial data exploration, several other features were calculated. A predictive regression model was then created using select features in order to predict the heart disease mortality rate of 3080 county/year pairs, representing 1540 distinct counties.
+
+While building and tuning the predictive model, the following features were deemed significant to the predictive power of the model:
+
+
+### Area Information
+* Area RUCC (Rural-Urban Continuum Codes) – classifies each county into one of 9 mutually exclusive categories that identifies (a) the population size, (b) the degree of urbanization and (c) proximity to a metropolitan area.
+    + While the RUCC itself did now show any strong correlation to heart disease mortality rate, by combining one or more RUCC values into one of 5 groups based solely on population size, the data showed 3 population groups that skewed below the mean heart disease mortality rate and 1 that skewed above the mean.
+    + Additionally, classifying the RUCC values into another calculated feature as “Metro” or “Non-Metro” showed the data being skewed below the mean for Metro and above the men for Non-Metro, adding an enhancement to the predictive model (data source: USDA Economic Research Service)
+
+### Economic Factors
+* Economic Typology – classifies each county into one of 6 mutually exclusive categories of economic dependence; two categories show a distribution skewed below the mean heart disease mortality rate and two categories are skewed above (source: USDA Economic Research Service).
+* Percent of Civilian Labor – the annualized percent of  the county’s population classified as civilian; analysis shows a moderate negative correlation to heart disease mortality rate (source: Bureau of Labor Statistics)
+
+### Demographics
+* Percent of non-Hispanic African Americans – analysis shows the strongest positive correlation among the 5 race/ethnicity groups (source: US Census Population Estimates)
+* Percent of adults with less than a high-school diploma; percent of adults with a Bachelor’s degree (or higher) – the former shows a strong positive correlation, while the latter shows an equally strong negative correlation (source: US Census Population Estimates)
+
+### Health Factors
+* Air Pollution Particulate Matter – measured in µg/m3; the average concentration of fine particulate matter as measured over the year. Lower concentrations skewed below the population mean while higher concentrations skewed above (source: CDC WONDER).
+* Percent of physical inactivity – percent of adult population that self-identifies as physically inactive (source: National Center for Chronic Disease Prevention and Health Promotion); physical inactivity showed a moderately strong correlation to heart disease mortality rate
+* Percent of adult obesity; percent of diabetes; percent of adult smoking – each of the three factors individually showed a strong correlation with heart disease mortality rate, but with a thought experiment and some data transformation into combined factors, an even stronger correlation was found (sources NCCDPHP; NCCDPHP, Division of Diabetes Translation; Behavioral Risk Factor Surveillance System)
+* Homicide, Motor Vehicle Death rates per 100,000 – two separate death rates (per 100,000 individuals); by scaling each rate to a logarithmic scale (base 10), a strong correlation to heart disease mortality rate was found (source: National Center for Health Statistics)
+
+## Data Exploration and Initial Analysis
+### Heart Disease Mortality Rate
+#### Descriptive Statistics
+Heart Disease Mortality Rate (herein shown with a unit of “deaths per 100,000 population”) in the given data set showed a mean of 279.4, median of 275.0, and standard deviation of 59.0 with a range of 109.0 – 512.0. A histogram with 40 equal bins (calculated based on the minimum and maximum values) and a box plot both show that heart disease mortality rate is approximately normal (skewed very slightly positive), with only approximately 10-15 outliers (values outside of the Inner Quartile Range of 237 – 317).
+
+```{r}
+#Historgram & boxplot
+train_data %>% ggplot(aes(x=heart_disease_mortality_per_100k))+geom_histogram(bins=40)+
+  xlab("heart_mort_100k")+
+  geom_vline(linetype = "dashed", color = "purple", xintercept = hd_med)+
+  geom_vline(linetype = "dashed", color = "blue", xintercept = hd_mean)+
+  annotate("text", x=hd_mean+20, y=250, label="<- mean", size=3, color = "blue")+
+  annotate("text", x=hd_med-20, y=250, label="median ->", size=3, color = "purple")  
+
+train_data %>% ggplot(aes(y=heart_disease_mortality_per_100k))+geom_boxplot()+
+  geom_hline(linetype = "dashed", color = "blue", yintercept = hd_mean)+
+  theme(axis.text.x=element_blank())
+```
+
+#### Distributions Across Categorical Features
+##### Economic Typology
+The 6 economic typologies used by the USDA Economic Research Service to assign to each county are
+
+*Farm-dependent
+*Federal/State government-dependent
+*Manufacturing-dependent
+*Mining-dependent
+*Non-specialized
+*Recreation
+
+The typologies speak to the main type of industries of a particular county. So while we don’t have the specific industries in each county (knowing, intellectually, that certain industries have been linked in the past to specific conditions, including heart disease), we can use the typology as a good representative proxy for specific industries. To identify any potential relationship between typology and heart disease mortality, we use histograms and box plots to examine each typology for an abnormal or skewed distribution.
+
+```{r}
+#Histograms for economic type
+train_data %>% ggplot(aes(x=heart_disease_mortality_per_100k))+
+              xlab("heart_mort_100k")+
+              geom_histogram(binwidth = (high_mort-low_mort)/50)+
+              facet_wrap(~ econ__economic_typology, ncol = 3)+
+              geom_vline(linetype="dashed", xintercept = hd_mean, color = "blue")+
+              geom_vline(linetype="dashed", xintercept = hd_med, color = "red")+
+              ggtitle("Economic Typology")+theme(plot.title = element_text(hjust=0.5))+
+              annotate("text", x=hd_mean+40, y=100, label="<- mean", size=2.5, color = "blue")+
+              annotate("text", x=hd_med-40, y=100, label="median ->", size=2.5, color = "red")
+
+#Box plot by economic type
+train_data %>% ggplot(aes(x=econ__economic_typology, y=heart_disease_mortality_per_100k))+
+        geom_boxplot() + 
+        geom_hline(linetype="dashed", yintercept = hd_mean, color = "blue")+xlab("")+
+        geom_hline(linetype="dashed", yintercept = hd_med, color = "red")+
+        theme(axis.text.x = element_text(angle = 45, hjust=1, vjust=1)) + 
+        ggtitle("Economic Typology")+theme(plot.title = element_text(hjust=0.5))+
+        annotate("text", x=.5, y=hd_mean+30, label="mean", size=3, color = "blue", angle=90)+
+        annotate("text", x=6.5, y=hd_med-30, label="median", size=3, color = "red", angle=90)
+
+```
+
+The histograms show that all of the typologies appear to be approximately normal. They also show that the mean from Recreation and from Farm-dependent (to a lesser degree) to be lower than the population mean. None of the typologies appear to have significantly higher means than the population average.  However, the box plots give a better picture of the distributions, showing that indeed Recreation and Farm-Dependent have their median value below the population average, while Manufacturing-dependent and Mining-dependent have medians well above the populate average (Non-specialized shows a very slight variation from the population mean and median).  The same results are shown below:
+
+--do stuff with knitr or gridextra--
+
+Due to heart disease mortality rates being distributed differently across the economic typologies, this feature is a good candidate for use in a predictive model.
+
+##### Population Spread
+The individual values for “Area_RUCC” have populations ranging from < 100 to > 600, and histograms show that many distributions do not appear to be approximately normal.
+
+```{r}
+plot <- ggplot(train_data,
+               aes(x=heart_disease_mortality_per_100k))+xlab("heart_mort_100k")+
+              geom_histogram(binwidth = (high_mort-low_mort)/40)
+plot <- plot+facet_wrap(~ area__rucc, ncol = 3)
+plot <- plot+geom_vline(linetype="dashed", xintercept = hd_mean, color = "blue")
+plot <- plot+geom_vline(linetype="dashed", xintercept = hd_med, color = "red")
+plot <- plot + annotate("text", x=hd_mean+40, y=55, label="<- mean", size=2.5, color = "blue")
+plot <- plot + annotate("text", x=hd_med-40, y=55, label="median ->", size=2.5, color = "red")
+plot
+```
+
+However, we can transform them into population groups as a proxy for Area_RUCC. The transformation is 
+
+--maybe stuff with knitr or gridextra instead--
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+library(gridExtra)
+library(grid)
+lvl <- levels(train_data$area__rucc)
+pop_lvl <- c("1M+", "250k-1M", "20-250K", "under 2,500", "under 2,500", "2.5-20K", "2.5-20k", "20-250K", "20-250K")
+
+rucc_tab <- data.frame(Area_RUCC=lvl, Population=pop_lvl)
+
+grid.table(rucc_tab)
+```
+
+```{r eval=FALSE}
+
+train_data <- train_data %>% 
+  mutate(population = ifelse(like(train_data$area__rucc, "19,999"),"2.5-20k",
+                      ifelse(like(train_data$area__rucc, "less than 2,500"), "under 2.5k",
+                      ifelse(like(train_data$area__rucc, "20,000"), "20-250k",
+                      ifelse(like(train_data$area__rucc, "fewer than 250,000"), "20-250k", ##same group
+                      ifelse(like(train_data$area__rucc, "250,000"), "250k-1M",
+                     "1M+"))))))
+```
+
+```{r}
+#Histograms by population groups
+plot <- ggplot(train_data,
+               aes(x=heart_disease_mortality_per_100k))+xlab("heart_mort_100k")+
+            geom_histogram(binwidth = (high_mort-low_mort)/40)
+plot <- plot+facet_wrap(~ population, ncol = 3)
+plot <- plot+geom_vline(linetype="dashed", xintercept = hd_mean, color = "blue")
+plot <- plot+geom_vline(linetype="dashed", xintercept = hd_med, color = "red")
+plot <- plot + annotate("text", x=hd_mean+40, y=75, label="<- mean", size=2.5, color = "blue")
+plot <- plot + annotate("text", x=hd_med-40, y=75, label="median ->", size=2.5, color = "red")
+plot
+
+#Box plot by population group
+plot <- ggplot(train_data,
+               aes(x=population, y=heart_disease_mortality_per_100k))+ xlab("")+
+  geom_boxplot()+ geom_hline(linetype="dashed", yintercept = hd_mean, color = "blue")
+plot <- plot+geom_hline(linetype="dashed", yintercept = hd_med, color = "red")
+plot <- plot + theme(axis.text.x = element_text(angle = 45, hjust=1, vjust=1)) + ggtitle("Population Groups")
+plot <- plot + annotate("text", x=.5, y=hd_mean+30, label="mean", size=3, color = "blue", angle=90)
+plot <- plot + annotate("text", x=5.5, y=hd_med-30, label="median", size=3, color = "red", angle=90)
+plot
+```
+
