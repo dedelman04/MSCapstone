@@ -336,6 +336,11 @@ for (i in 1:length(cname)) {
     ylab("hrt_mort")+
     xlab(substr(cname[i], 7, 100))+
     xlim(0,max(train_data[cname[i]], na.rm=TRUE)+.05)
+    
+    if(cname[i]=="econ__pct_civilian_labor") {
+      dplot <- dplot + theme(plot.background = element_rect(colour = "black", fill=NA, size=2))
+    }
+
 
   p[[i]] <- dplot+geom_point(na.rm=TRUE)+
     geom_smooth(method="lm", se=TRUE, na.rm=TRUE)+
@@ -345,7 +350,7 @@ for (i in 1:length(cname)) {
 do.call(grid.arrange, p)
 ```
 
-As seen in Figure 8, “Percent of Civilian Labor” shows a moderate negative correlation with heart disease mortality (despite the number of outliers appearing to be greater than the other factors) and is a good candidate for use in a predictive model.  The remaining factors do not show a strong enough correlation ( >= 0.45) to be considered good candidates.
+As seen and highlighted in Figure 8, “Percent of Civilian Labor” shows a moderate negative correlation with heart disease mortality (despite the number of outliers appearing to be greater than the other factors) and is a good candidate for use in a predictive model.  The remaining factors do not show a strong enough correlation ( >= 0.45) to be considered good candidates.
 
 ##### Demographics
 The dataset contains 12 demographic features that are reported as percentages of the population. A correlation analysis of those features in a similar manner to the economic factors. (NOTE: there are 2 numeric features that are represented as rates per 1000 people, and act more like categorical features as they are distinct whole numbers; a cursory exploration of these two factors was performed, but nothing of interest resulted from the exploration)
@@ -374,6 +379,11 @@ for (i in 1:length(cname)) {
                     ylab("hrt_mort")+
                     xlab(substr(cname[i], 11, 100)) #+
                     #xlim(0,1)
+  if(cname[i] %in% c("demo__pct_non_hispanic_african_american",
+                     "demo__pct_adults_less_than_a_high_school_diploma",
+                     "demo__pct_adults_bachelors_or_higher")) {
+      dplot <- dplot + theme(plot.background = element_rect(colour = "black", fill=NA, size=2))
+  }
 
   p[[i]] <- dplot+geom_point(na.rm=TRUE)+
     geom_smooth(method="lm", se=TRUE, na.rm=TRUE)+
@@ -388,3 +398,50 @@ Analysis of the correlation scatter plots showed that there were several candida
 The other two demographic categories related to education level (“High School Diploma”, “Some College”) were considered as features, but in practice they added no predictive power to the model. Two combination features, one of which added together “High School” and “Less than High School” and the other “Some College” and “Bachelor’s or higher” were considered as well.  While the combination features had higher correlations with heart disease mortality than the individual features, in practice the model seemed to suffer from overfitting when the combination features were used in place of the individual ones.
 
 Because of their extremely weak correlations (abs value < .15), demographic features related to gender and age were not considered for the model.
+
+#### Health Statistics
+There are 10 more health-related factors present in the dataset (after air pollution). All are numerical, 6 are presented as percentage of the population, two are rates per 100,000 people, and two are rates related to the number of people per medical professional (primary care doctor, dentist).  The 2 features related to medical professional did not show a strong correlation ( > 0.45) to heart disease mortality rate, so they were not considered for the predictive model.
+
+##### Health Percentages
+A scatter plot and correlation analysis was done for the 6 numerical features presented as population percentages:
+
+```{r}
+#Correlation among health stats
+cname <- colnames(train_data)
+cname <- cname[like(cname,"health__pct")]
+#cname <- cname[!like(cname, "_1k")]
+
+par(mfrow=c(4,3))
+
+p = list()
+
+for (i in 1:length(cname)) {
+  #Calculate correlation between health pct and mortality
+  cor <- round(cor(data.frame(train_data$heart_disease_mortality_per_100k,
+                        train_data[,cname[i]]),
+             use="complete.obs")[1,2],3)
+  cor <- paste("corr =", as.character(cor))
+
+  #Scatter plot
+    dplot <- ggplot(train_data,
+                  aes_string(y="heart_disease_mortality_per_100k",
+                             x=cname[i]))+
+    ylab("hrt_mort")+
+    xlab(substr(cname[i], 9, 100))+
+    xlim(0,.6)
+  
+  if(cname[i] %in% c("health__pct_adult_obesity",
+                     "health__pct_adult_smoking",
+                     "health__pct_diabetes",
+                     "health__pct_physical_inacticity")) {
+      dplot <- dplot + theme(plot.background = element_rect(colour = "black", fill=NA, size=2))
+  }
+
+  p[[i]] <- dplot+geom_point(na.rm=TRUE)+
+    geom_smooth(method="lm", se=TRUE, na.rm=TRUE)+
+    annotate("text", x=.5, y=500, label= cor, size=3.5)
+}
+
+do.call(grid.arrange, p)
+```
+

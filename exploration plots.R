@@ -157,9 +157,9 @@ for (i in 1:length(cname)) {
     xlab(substr(cname[i], 7, 100))+
     xlim(0,max(train_data[cname[i]], na.rm=TRUE)+.05)
 
-    #if(cname[i]=="econ__pct_civilian_labor") {
-    #  dplot <- dplot + box(which="plot", lty="solid")
-    #}
+    if(cname[i]=="econ__pct_civilian_labor") {
+      dplot <- dplot + theme(plot.background = element_rect(colour = "black", fill=NA, size=2))
+    }
   cor <- round(cor(data.frame(train_data$heart_disease_mortality_per_100k,
                               train_data[,cname[i]]),
                    use="complete.obs")[1,2],3)
@@ -195,6 +195,12 @@ for (i in 1:length(cname)) {
     ylab("hrt_mort")+
     xlab(substr(cname[i], 11, 100)) #+
   #xlim(0,1)
+  
+  if(cname[i] %in% c("demo__pct_non_hispanic_african_american",
+                     "demo__pct_adults_less_than_a_high_school_diploma",
+                     "demo__pct_adults_bachelors_or_higher")) {
+    dplot <- dplot + theme(plot.background = element_rect(colour = "black", fill=NA, size=2))
+  }
   
   p[[i]] <- dplot+geom_point(na.rm=TRUE)+
     geom_smooth(method="lm", se=TRUE, na.rm=TRUE)+
@@ -433,6 +439,18 @@ for (i in 1:length(cname)) {
              use="complete.obs")[1,2],3)
   cor <- paste("corr =", as.character(cor))
 
+  if(cname[i] %in% c("health__pct_adult_obesity",
+                     "health__pct_adult_smoking",
+                     "health__pct_diabetes",
+                     "health__pct_physical_inacticity")) {
+    dplot <- dplot + theme(plot.background = element_rect(colour = "black", fill=NA, size=2))
+  }
+  
+#  if(cname[i] %in% c("health__pct_low_birthweight",
+#                     "health__pct_excessive_drinking")) {
+#    dplot <- dplot + theme(plot.background = element_rect(colour = "gray", fill=1, alpha = 0.3, size=2))
+#  }
+  
   p[[i]] <- dplot+geom_point(na.rm=TRUE)+
     geom_smooth(method="lm", se=TRUE, na.rm=TRUE)+
     annotate("text", x=.5, y=500, label= cor, size=3.5)
