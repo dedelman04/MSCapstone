@@ -182,6 +182,8 @@ train_data <- train_data %>%
                      "1M+"))))))
 ```
 
+Looking at the histograms we now see a more even spread of data and more normal distributions.
+
 ```{r}
 #Histograms by population groups
 plot <- ggplot(train_data,
@@ -193,7 +195,11 @@ plot <- plot+geom_vline(linetype="dashed", xintercept = hd_med, color = "red")
 plot <- plot + annotate("text", x=hd_mean+40, y=75, label="<- mean", size=2.5, color = "blue")
 plot <- plot + annotate("text", x=hd_med-40, y=75, label="median ->", size=2.5, color = "red")
 plot
+```
 
+The “2.5-20K” group appears to be skewed somewhat positive, while the “1M+” group is skewed negative, even though the peak is below the population mean and median. Box plots show the distributions more cleanly.
+
+```{r}
 #Box plot by population group
 plot <- ggplot(train_data,
                aes(x=population, y=heart_disease_mortality_per_100k))+ xlab("")+
@@ -205,3 +211,180 @@ plot <- plot + annotate("text", x=5.5, y=hd_med-30, label="median", size=3, colo
 plot
 ```
 
+Here we can more clearly see that the median for “under 2.5K”, “250K-1M” and “1M+” are all below the population mean and median. The group “2.5-20K” has a median well above the population mean and median, while the “20-250K” group median is only slightly higher than the population.
+
+--do stuff with knitr or gridextra--
+
+With population groups showing a different distribution for heart mortality rates, this calculated feature is another good candidate for use in a predictive model.
+
+The analysis went one step further and grouped the RUCC values based on whether or not the county was considered to be a metropolitan area or not.  Based solely on the first word in the RUCC category title (see Table 2), each county was classified as either “Metro” or “Non-Metro”.
+
+```{r}
+#Histograms by metro type
+plot <- ggplot(train_data,
+               aes(x=heart_disease_mortality_per_100k))+xlab("heart_mort_100k")+
+  geom_histogram(binwidth = (high_mort-low_mort)/40)
+plot <- plot+facet_wrap(~ metro, ncol = 3)
+plot <- plot+geom_vline(linetype="dashed", xintercept = hd_mean, color = "blue")
+plot <- plot+geom_vline(linetype="dashed", xintercept = hd_med, color = "red")
+plot <- plot + annotate("text", x=hd_mean+40, y=150, label="<- mean", size=2.5, color = "blue")
+plot <- plot + annotate("text", x=hd_med-40, y=150, label="median ->", size=2.5, color = "red")
+plot
+
+#Box plot by metro_type
+plot <- ggplot(train_data,
+               aes(x=metro, y=heart_disease_mortality_per_100k))+xlab("")+
+  geom_boxplot()+ geom_hline(linetype="dashed", yintercept = hd_mean, color = "blue")
+plot <- plot+geom_hline(linetype="dashed", yintercept = hd_med, color = "red")
+plot <- plot + theme(axis.text.x = element_text(angle = 45, hjust=1, vjust=1)) + ggtitle("Metropolitan Type")
+plot <- plot + annotate("text", x=.5, y=hd_mean+30, label="mean", size=3, color = "blue", angle=90)
+plot <- plot + annotate("text", x=2.5, y=hd_med-30, label="median", size=3, color = "red", angle=90)
+plot
+```
+
+The box plots clearly show that metropolitan areas have a lower median than the population, while non-metropolitan areas skew higher than the population as a whole.
+
+--do stuff with knitr or gridextra--
+
+##### Air Pollution
+Ambient air pollution for the county is presented in the data set as a measure of the concentration of fine particulate matter, as measured in µg/m^3^. These figures were presented as positive integers, so as a feature of the data set it is more akin to a categorical variable.  The initial spread of values showed a large discrepancy in population size, especially in the min and max regions (A), so values were grouped into a smaller number of populations that were closer in size (B)
+
+```{r}
+#Histogram for air pollution original
+plot <- ggplot(subset(train_data, !is.na(health__air_pollution_particulate_matter)),
+               aes(x=health__air_pollution_particulate_matter))+
+  geom_histogram(binwidth=1) + xlab("air pollution (mcg/m3)")
+plot <- plot + theme(axis.text.x = element_text(size=20))+
+  ggtitle("(A)")+theme(plot.title = element_text(hjust=0.5))
+plot
+
+#Histogram for air pollution regrouped
+cut_labels <- c("<= 10", "11", "12", "13", "14+")
+cut_levels <- c(0, 10.9, 11.9, 12.9, 13.9, 100)
+
+train_data$air_pollution <- cut(train_data$health__air_pollution_particulate_matter, cut_levels)
+levels(train_data$air_pollution) <- cut_labels
+
+plot <- ggplot(subset(train_data, !is.na(air_pollution)),
+               aes(x=air_pollution))+
+  geom_bar() + xlab("air pollution (mcg/m3)")
+plot <- plot + theme(axis.text.x = element_text(size=20))+
+  ggtitle("(B)")+theme(plot.title = element_text(hjust=0.5))
+plot
+```
+
+Using the new groups, histograms and boxplots show the spreads to be approximately normal, with some groups skewing below the population mean and some above. The group with 12 µg/m^3^ shows a mean just at the population mean, with a median slightly lower.
+
+```{r}
+#Histograms by air pollution
+plot <- ggplot(subset(train_data, !is.na(air_pollution)),
+               aes(x=heart_disease_mortality_per_100k))+xlab("heart_mort_100k")+
+  geom_histogram(binwidth = (high_mort-low_mort)/40)
+plot <- plot+facet_wrap(~ air_pollution, drop=TRUE, ncol = 3)
+plot <- plot+geom_vline(linetype="dashed", xintercept = hd_mean, color = "blue")
+plot <- plot+geom_vline(linetype="dashed", xintercept = hd_med, color = "red")
+plot <- plot + annotate("text", x=hd_mean+40, y=80, label="<- mean", size=2.5, color = "blue")
+plot <- plot + annotate("text", x=hd_med-40, y=80, label="median ->", size=2.5, color = "red")
+plot
+
+#Box plot by air_pollution
+plot <- ggplot(subset(train_data, !is.na(air_pollution)),
+               aes(x=air_pollution, y=heart_disease_mortality_per_100k))+xlab("")+
+  geom_boxplot()+ geom_hline(linetype="dashed", yintercept = hd_mean, color = "blue")
+plot <- plot+geom_hline(linetype="dashed", yintercept = hd_med, color = "red")
+plot <- plot + theme(axis.text.x = element_text(angle = 45, hjust=1, vjust=1)) + ggtitle("Air Pollution (mcg/m^3)")+theme(plot.title = element_text(hjust=0.5))
+plot <- plot + annotate("text", x=.5, y=hd_mean+30, label="mean", size=3, color = "blue", angle=90)
+plot <- plot + annotate("text", x=5.5, y=hd_med-30, label="median", size=3, color = "red", angle=90)
+plot
+```
+
+A statistical summary of the air pollution groups confirms the interpretation of the histogram and box plots, and makes this feature a suitable candidate for a predictive model.
+
+--do stuff with knitr or gridextra--
+
+#### Correlation Between Numeric Features and Heart Disease Mortality
+(note: all correlation calculations in this analysis are performed after data records with missing values for the feature in questions are removed)
+
+##### Economic Factors
+The remaining economic factors in the dataset (after already looking at typology) are numeric, so a correlation analysis is done to determine if any of these are candidates for use in a predictive model.
+*	% Civilian Labor
+*	% Unemployment
+*	% Uninsured Adults
+*	% Uninsured Children
+
+```{r}
+#Correlation among econ stats
+cname <- colnames(train_data)
+cname <- cname[like(cname,"econ__pct")]
+
+par(mfrow=c(2,2))
+
+p = list()
+
+for (i in 1:length(cname)) {
+
+  #Determine correlation with default method
+  cor <- round(cor(data.frame(train_data$heart_disease_mortality_per_100k,
+                              train_data[,cname[i]]),
+                   use="complete.obs")[1,2],3)
+  cor <- paste("corr =", as.character(cor))
+  
+  #Plot econ factor vs mortality
+    dplot <- ggplot(train_data, 
+                  aes_string(y="heart_disease_mortality_per_100k",
+                             x=cname[i]))+
+    ylab("hrt_mort")+
+    xlab(substr(cname[i], 7, 100))+
+    xlim(0,max(train_data[cname[i]], na.rm=TRUE)+.05)
+
+  p[[i]] <- dplot+geom_point(na.rm=TRUE)+
+    geom_smooth(method="lm", se=TRUE, na.rm=TRUE)+
+    annotate("text", x=max(train_data[cname[i]],na.rm=TRUE), y=500, label= cor, size=3)
+}
+
+do.call(grid.arrange, p)
+```
+
+As seen in Figure 8, “Percent of Civilian Labor” shows a moderate negative correlation with heart disease mortality (despite the number of outliers appearing to be greater than the other factors) and is a good candidate for use in a predictive model.  The remaining factors do not show a strong enough correlation ( >= 0.45) to be considered good candidates.
+
+##### Demographics
+The dataset contains 12 demographic features that are reported as percentages of the population. A correlation analysis of those features in a similar manner to the economic factors. (NOTE: there are 2 numeric features that are represented as rates per 1000 people, and act more like categorical features as they are distinct whole numbers; a cursory exploration of these two factors was performed, but nothing of interest resulted from the exploration)
+
+```{r}
+#Correlation among demo stats
+cname <- colnames(train_data)
+cname <- cname[like(cname,"demo_")]
+cname <- cname[!like(cname, "_1k")]
+
+par(mfrow=c(3,4))
+
+p = list()
+
+for (i in 1:length(cname)) {
+  #Determine correlation with default method
+    cor <- round(cor(data.frame(train_data$heart_disease_mortality_per_100k,
+                              train_data[,cname[i]]),
+                   use="complete.obs")[1,2],3)
+  cor <- paste("corr =", as.character(cor))
+
+  #Plot demo vs mortality
+  dplot <- ggplot(train_data, 
+                  aes_string(y="heart_disease_mortality_per_100k",
+                             x=cname[i]))+
+                    ylab("hrt_mort")+
+                    xlab(substr(cname[i], 11, 100)) #+
+                    #xlim(0,1)
+
+  p[[i]] <- dplot+geom_point(na.rm=TRUE)+
+    geom_smooth(method="lm", se=TRUE, na.rm=TRUE)+
+    annotate("text", x=.9, y=500, label= cor, size=2.5)+xlim(0, 1)
+}
+
+do.call(grid.arrange, p)
+```
+
+Analysis of the correlation scatter plots showed that there were several candidates for model features. “Percent of non-Hispanic African Americans” was chosen as it had the strongest correlation in the subset of race/ethnicity demographics, even though its actual correlation was only moderate ( < .45 ).  “Adults with less than a High School diploma” and “Adults with a Bachelor’s Degree or higher” were chosen for their strong positive and negative correlations, respectively.
+
+The other two demographic categories related to education level (“High School Diploma”, “Some College”) were considered as features, but in practice they added no predictive power to the model. Two combination features, one of which added together “High School” and “Less than High School” and the other “Some College” and “Bachelor’s or higher” were considered as well.  While the combination features had higher correlations with heart disease mortality than the individual features, in practice the model seemed to suffer from overfitting when the combination features were used in place of the individual ones.
+
+Because of their extremely weak correlations (abs value < .15), demographic features related to gender and age were not considered for the model.
