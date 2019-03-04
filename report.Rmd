@@ -313,6 +313,32 @@ The remaining economic factors in the dataset (after already looking at typology
 *	% Uninsured Children
 
 ```{r}
+cols <- colnames(train_data)[like(colnames(train_data), "econ__pct")] 
+ncol <- ifelse(length(cols) <= 6, 2, 3)
+
+train_data %>% select(heart_disease_mortality_per_100k, cols) %>%
+  gather(data_type, val, -heart_disease_mortality_per_100k) %>%
+  mutate(data_type = substr(data_type, 7, 100)) %>%
+  mutate(val= val*100) %>%
+  ggplot(aes(x=val, y= heart_disease_mortality_per_100k))+geom_point(na.rm = TRUE)+
+  facet_wrap(~ data_type, ncol=ncol, scales="free_x")+xlab("percent")+
+  geom_smooth(method="lm", na.rm = TRUE)
+
+```
+```{r}
+corr <- data.frame(round(data.frame(train_data %>% 
+                                      select(heart_disease_mortality_per_100k, cols) %>%
+  cor(use="complete.obs"))[-1, 1],3))
+corr <- cbind(cols, corr)
+colnames(corr) <- c("type", "cor")
+corr <- corr %>% mutate(type = substr(type, 7, 100)) %>% arrange(desc(abs(cor)))
+
+corr %>% grid.table()
+
+
+```
+
+```{r, eval=FALSE, echo=FALSE}
 #Correlation among econ stats
 cname <- colnames(train_data)
 cname <- cname[like(cname,"econ__pct")]
@@ -350,12 +376,39 @@ for (i in 1:length(cname)) {
 do.call(grid.arrange, p)
 ```
 
-As seen and highlighted in Figure 8, “Percent of Civilian Labor” shows a moderate negative correlation with heart disease mortality (despite the number of outliers appearing to be greater than the other factors) and is a good candidate for use in a predictive model.  The remaining factors do not show a strong enough correlation ( >= 0.45) to be considered good candidates.
+As seen above, “Percent of Civilian Labor” shows a moderate negative correlation with heart disease mortality (despite the number of outliers appearing to be greater than the other factors) and is a good candidate for use in a predictive model.  The remaining factors do not show a strong enough correlation ( >= 0.45) to be considered good candidates.
 
 ##### Demographics
 The dataset contains 12 demographic features that are reported as percentages of the population. A correlation analysis of those features in a similar manner to the economic factors. (NOTE: there are 2 numeric features that are represented as rates per 1000 people, and act more like categorical features as they are distinct whole numbers; a cursory exploration of these two factors was performed, but nothing of interest resulted from the exploration)
 
 ```{r}
+cols <- colnames(train_data)[like(colnames(train_data), "demo__pct")] 
+ncol <- ifelse(length(cols) <= 6, 2, 3)
+
+train_data %>% select(heart_disease_mortality_per_100k, cols) %>%
+  gather(data_type, val, -heart_disease_mortality_per_100k) %>%
+  mutate(data_type = substr(data_type, 11, 100)) %>%
+  mutate(val = val * 100) %>%
+  ggplot(aes(x=val, y= heart_disease_mortality_per_100k))+geom_point(na.rm = TRUE)+
+  facet_wrap(~ data_type, ncol=ncol, scales="fixed")+xlab("percent")+
+  geom_smooth(method="lm", na.rm = TRUE)
+```
+```{r}
+corr <- data.frame(round(data.frame(train_data %>% 
+                                      select(heart_disease_mortality_per_100k, cols) %>%
+  cor(use="complete.obs"))[-1, 1],3))
+corr <- cbind(cols, corr)
+
+colnames(corr) <- c("type", "cor")
+corr <- corr %>% mutate(type = substr(type, 7, 100)) %>% arrange(desc(abs(cor)))
+
+corr %>% grid.table()
+
+
+```
+
+
+```{r, echo=FALSE, eval=FALSE}
 #Correlation among demo stats
 cname <- colnames(train_data)
 cname <- cname[like(cname,"demo_")]
@@ -406,6 +459,30 @@ There are 10 more health-related factors present in the dataset (after air pollu
 A scatter plot and correlation analysis was done for the 6 numerical features presented as population percentages:
 
 ```{r}
+cols <- colnames(train_data)[like(colnames(train_data), "health__pct")] 
+ncol <- ifelse(length(cols) <= 6, 2, 3)
+
+train_data %>% select(heart_disease_mortality_per_100k, cols) %>%
+  gather(data_type, val, -heart_disease_mortality_per_100k) %>%
+  mutate(data_type = substr(data_type, 9, 100)) %>%
+  mutate(val = val * 100) %>%
+  ggplot(aes(x=val, y= heart_disease_mortality_per_100k))+geom_point(na.rm = TRUE)+
+  facet_wrap(~ data_type, ncol=ncol, scales="fixed")+xlab("percent")+
+  geom_smooth(method="lm", na.rm = TRUE)
+```
+```{r}
+corr <- data.frame(round(data.frame(train_data %>% 
+                                      select(heart_disease_mortality_per_100k, cols) %>%
+  cor(use="complete.obs"))[-1, 1],3))
+corr <- cbind(cols, corr)
+
+colnames(corr) <- c("type", "cor")
+corr <- corr %>% mutate(type = substr(type, 9, 100)) %>% arrange(desc(abs(cor)))
+
+corr %>% grid.table()
+```
+
+```{r, eval=FALSE, echo=FALSE}
 #Correlation among health stats
 cname <- colnames(train_data)
 cname <- cname[like(cname,"health__pct")]

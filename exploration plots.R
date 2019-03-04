@@ -2,6 +2,8 @@ library(tidyverse)
 library(data.table)
 library(ggplot2)
 library(gridExtra)
+library(knitr)
+library(kableExtra)
 
 ###BEGIN DATA LOAD WORK
 #######################
