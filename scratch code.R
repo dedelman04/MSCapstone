@@ -1,4 +1,4 @@
-cols <- colnames(train_data)[like(colnames(train_data), "p_")]
+cols <- colnames(train_data)[like(colnames(train_data), "demo__pct")]
 cols <- cols[!like(cols, "health_")]
 ncol <- ifelse(length(cols) <= 6, 2, 3)
 
@@ -11,18 +11,16 @@ train_data %>% select(heart_disease_mortality_per_100k, cols) %>%
   geom_smooth(method="lm", na.rm = TRUE)+xlab("percent")
 #  scale_x_continuous(labels=scales::percent)
 
-corr <- data.frame(round(data.frame(train_data %>% select(heart_disease_mortality_per_100k, cols) %>%
-  cor(use="complete.obs")),3))
-corr <- cbind(cols, corr)
+corr <- data.frame()
+for (i in 1:length(cols)) {
+  corr[cols[i],1] <- round(cor(data.frame(train_data$heart_disease_mortality_per_100k,
+                              train_data[,cols[i]]),
+                   use="complete.obs")[1,2],3)
+}
 
+corr <- cbind(cols, corr)
 colnames(corr) <- c("type", "cor")
 corr <- corr %>% arrange(desc(abs(cor)))
 
 corr %>% grid.table()
 
-cor <- data.frame(cor=c_corr)
-rownames(cor) <- cols
-cor
-
-cor(data.frame(train_data$heart_disease_mortality_per_100k, 
-               train_data$p_diab_obese), use="complete.obs")
