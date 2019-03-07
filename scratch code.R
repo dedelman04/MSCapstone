@@ -24,3 +24,54 @@ corr <- corr %>% arrange(desc(abs(cor)))
 
 corr %>% grid.table()
 
+train_data <- train_data %>% 
+  mutate(econ_factor = 
+    #as.factor(
+      ifelse(econ__economic_typology %in% c("Manufacturing-dependent", 
+                                            "Mining-dependent", 
+                                            "Nonspecialized"), 1,
+             ifelse(econ__economic_typology %in% c("Farm-dependent",
+                                                   "Recreation"), -1, 0)))#)
+
+#levels(train_data$econ_factor) <- c("Below Mean", "No Diff", "Above Mean")
+
+train_data %>% ggplot(aes(x=demo__pct_adults_less_than_a_high_school_diploma, y=heart_disease_mortality_per_100k))+
+  geom_point(aes(color = econ__economic_typology))
+  geom_hline(linetype="dashed", yintercept = hd_mean, color = "blue")+
+  geom_hline(linetype="dashed", yintercept = hd_med, color = "red")
+
+  
+##Modelling
+
+model_cols <- c("econ__economic_typology",
+                "population",
+                "metro",
+                "air_pollution",
+                "econ__pct_civilian_labor",
+                "demo__pct_non_hispanic_african_american",
+                "demo__pct_adults_bachelors_or_higher",
+                "demo__pct_adults_less_than_a_high_school_diploma",
+                "p_diab_obese",
+                "p_diab_smoke",
+                "p_all_three",
+                "health__homicides_per_100k",
+                "health__motor_vehicle_crash_deaths_per_100k")
+
+cont_cols <- model_cols[-c(1:4)]
+
+#Replace NA with column mean
+train_data <- train_data %>%
+  mutate_at(cont_cols, ~ifelse(is.na(.x), mean(.x, na.rm = TRUE), .x)) %>%
+  mutate_at(c("health__air_pollution_particulate_matter"), ~ifelse(is.na(.x), median(.x, na.rm=TRUE), .x))
+
+lm_form <- as.formula(paste("heart_disease_mortality_per_100k ~ ", paste(model_cols, collapse="+")))
+
+test_index <- createDataPartition(train_data$heart_disease_mortality_per_100k, times = 1, p=0.5, list=FALSE)
+train_set <- train_data[-test_index,]
+test_set <- train_data[test_index,]
+
+fit <- lm(formula = lm_form, data = train_set)
+y_hat <- predict(fit, test_set)
+sqrt(mean((y_hat-test_set$heart_disease_mortality_per_100k)^2, na.rm=TRUE))
+
+median(train_data$health__air_pollution_particulate_matter, na.rm = TRUE)

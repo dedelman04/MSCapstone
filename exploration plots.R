@@ -4,6 +4,7 @@ library(ggplot2)
 library(gridExtra)
 library(knitr)
 library(kableExtra)
+library(caret)
 
 ###BEGIN DATA LOAD WORK
 #######################
