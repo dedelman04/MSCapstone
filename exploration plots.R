@@ -9,11 +9,13 @@ library(caret)
 ###BEGIN DATA LOAD WORK
 #######################
 
-train_df <- read.csv("C:/users/dedelman/desktop/capstone/train_values.csv",
-                  header=TRUE,
-                  stringsAsFactors = TRUE)
+path <- "/Users/edelmans/Documents/MSCapstone/"
+#path <- "C:/users/dedelman/desktop/capstone/"
+train_df <- read.csv(file=paste0(path,"train_values.csv"),
+                     header=TRUE,
+                     stringsAsFactors = TRUE)
 
-train_label <- read.csv("C:/users/dedelman/desktop/capstone/train_labels.csv",
+train_label <- read.csv(file=paste0(path,"train_labels.csv"),
                         header=TRUE,
                         stringsAsFactors = TRUE)
 
@@ -77,6 +79,9 @@ levels(train_data$dentist) <- cut_labels
 train_data$log_homicide_per_100k <- ifelse(train_data$health__homicides_per_100k <= 0, NA, log10(train_data$health__homicides_per_100k))
 train_data$log_motor_vehicle_death_per_100k <- log10(train_data$health__motor_vehicle_crash_deaths_per_100k)
 
+train_data <- train_data %>% 
+  mutate(health__pct_physical_inactivity = health__pct_physical_inacticity) %>%
+  select(-health__pct_physical_inacticity)
 
 #store population mean and median
 hd_mean = mean(train_data$heart_disease_mortality_per_100k)

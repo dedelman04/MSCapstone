@@ -59,6 +59,25 @@ model_cols <- c("econ__economic_typology",
 
 cont_cols <- model_cols[-c(1:4)]
 
+#How many rows have at least 1 missing numeric value?
+missval <- c()
+for (j in train_data$row_id){
+   missing_ind <- c()
+   missing_ind <- which(is.na(train_data[row_id==j, cont_cols]))
+   if(length(missing_ind > 0)) {missval[j] <- "Yes"}  
+}
+
+mval <- function(x) {
+  this_row <- train_data %>% filter(row_id==x) %>% 
+    select(row_id, cont_cols) %>% as.vector()
+  which(is.na(this_row))
+}
+
+retval <- c()
+missval <- vapply(train_data$row_id, mval, FUN.VALUE=retval)
+
+which(length(missval)>0)
+
 #Replace NA with column mean
 train_data <- train_data %>%
   mutate_at(cont_cols, ~ifelse(is.na(.x), mean(.x, na.rm = TRUE), .x)) %>%
@@ -75,3 +94,4 @@ y_hat <- predict(fit, test_set)
 sqrt(mean((y_hat-test_set$heart_disease_mortality_per_100k)^2, na.rm=TRUE))
 
 median(train_data$health__air_pollution_particulate_matter, na.rm = TRUE)
+

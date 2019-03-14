@@ -12,11 +12,13 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(data.table)
 library(ggplot2)
-train_df <- read.csv("C:/users/dedelman/desktop/capstone/train_values.csv",
+path <- "/Users/edelmans/Documents/MSCapstone/"
+#path <- "C:/users/dedelman/desktop/capstone/"
+train_df <- read.csv(file=paste0(path,"train_values.csv"),
                   header=TRUE,
                   stringsAsFactors = TRUE)
 
-train_label <- read.csv("C:/users/dedelman/desktop/capstone/train_labels.csv",
+train_label <- read.csv(file=paste0(path,"train_labels.csv"),
                         header=TRUE,
                         stringsAsFactors = TRUE)
 
@@ -50,6 +52,10 @@ levels(train_data$area__rucc) <- c("Metro - 1 Million +",
                                   "Nonmetro - 20,000 or more, adjacent",
                                   "Nonmetro - 20,000 or more, non-adjacent"
                                   )
+
+train_data <- train_data %>% 
+  mutate(health__pct_physical_inactivity = health__pct_physical_inacticity) %>%
+  select(-health__pct_physical_inacticity)
 
 ```
 
@@ -531,3 +537,129 @@ for (i in 1:length(cname)) {
 do.call(grid.arrange, p)
 ```
 
+Percent of Physical Inactivity shows the strongest correlation with heart disease mortality among the health percentages, indicating a strong candidate for the predictive model. Three other percentages (Obesity, Smoking, Diabetes) also showed strong correlation with heart disease mortality, but some further thought and analysis produced features with even stronger correlations.
+
+##### Combining Health Percentages
+Thinking about the 3 health percentages:
+* Percent of adult obesity
+* Percent of adult smoking
+* Percent of diabetes
+we can say that each of the percentages is the same as the probability of a randomly chosen individual in that county having the specific condition. Let us further assume that each of the events (being obese, smoking, having diabetes) are independent of each other. According to probability theory, the probability of two independent events occurring is simply the product of the two individual probabilities. Therefore
+
+$P(diabetes & obese) = P(diabetes) * P(obese)$
+
+$P(diabetes & smoking) = P(diabetes) * P(smoking)$
+
+$P(obese & smoking) = P (obese) * P(smoking)$
+
+$P(obese & smoking & diabetes) = P(obese) * P(smoking) * P(diabetes)$
+
+By calculating these combined probabilities, we find features that have even stronger correlation that each individual feature
+```{r}
+train_data <- train_data %>% 
+  mutate(p_diab_obese = health__pct_adult_obesity * health__pct_diabetes) %>%
+  mutate(p_diab_smoke = health__pct_diabetes * health__pct_adult_smoking) %>%
+  mutate(p_obese_smoke = health__pct_adult_smoking * health__pct_adult_obesity) %>%
+  mutate(p_all_three = health__pct_adult_obesity * health__pct_adult_obesity * health__pct_adult_smoking )
+```
+```{r}
+cols <- c("p_diab_obese", 
+          "p_diab_smoke", 
+          "p_obese_smoke", 
+          "p_all_three")
+
+ncol <- ifelse(length(cols) <= 6, 2, 3)
+
+train_data %>% select(heart_disease_mortality_per_100k, cols) %>%
+  gather(data_type, val, -heart_disease_mortality_per_100k) %>%
+  mutate(data_type = substr(data_type, 3, 100)) %>%
+  mutate(val = val * 100) %>%
+  ggplot(aes(x=val, y= heart_disease_mortality_per_100k))+geom_point(na.rm = TRUE)+
+  facet_wrap(~ data_type, ncol=ncol, scales="fixed")+xlab("percent")+
+  geom_smooth(method="lm", na.rm = TRUE)
+```
+```{r, echo=FALSE}
+corr <- data.frame()
+for (i in 1:length(cols)) {
+  corr[cols[i],1] <- round(cor(data.frame(train_data$heart_disease_mortality_per_100k,
+                              train_data[,cols[i]]),
+                   use="complete.obs")[1,2],3)
+}
+
+corr <- cbind(cols, corr)
+colnames(corr) <- c("type", "cor")
+corr <- corr %>% mutate(type = substr(type, 3, 100)) %>% arrange(desc(abs(cor)))
+
+corr %>% grid.table()
+```
+
+The 3 combinations with the strongest correlations ( > 0.64) are good candidates for the predictive model (Diab+Obese, Diab+Smoke, All Three). In practice, Obese+Smoke did not add any predictive power to the model, so it was omitted.
+
+####Death Rates
+Homicide rate and Motor Vehicle Death rate (both per 100,000 individuals) each showed moderate correlation with heart disease mortality (0.441 and 0.460, respectively). However, when each factor was converted to a log10 scale, the correlation got stronger (.501, .504, respectively).
+
+```{r, warning=FALSE}
+train_data$log_homicide_per_100k <-
+  ifelse(train_data$health__homicides_per_100k <= 0, NA,
+         log10(train_data$health__homicides_per_100k))
+train_data$log_motor_vehicle_death_per_100k <-
+  log10(train_data$health__motor_vehicle_crash_deaths_per_100k)
+
+train_data <- train_data %>%
+  mutate(death_rate_motor_vehicle_crash_per_100k = health__motor_vehicle_crash_deaths_per_100k,
+         death_rate_homicides_per_100k = health__homicides_per_100k)
+
+cols <- c("death_rate_homicides_per_100k", 
+          "death_rate_motor_vehicle_crash_per_100k",
+          "log_homicide_per_100k",
+          "log_motor_vehicle_death_per_100k")
+
+ncol <- 2
+
+train_data %>% select(heart_disease_mortality_per_100k, cols) %>%
+  gather(data_type, val, -heart_disease_mortality_per_100k) %>%
+  ggplot(aes(x=val, y= heart_disease_mortality_per_100k))+geom_point(na.rm = TRUE)+
+  facet_wrap(~ data_type, ncol=ncol, scales="free_x")+xlab("per_100k")+
+  geom_smooth(method="lm", na.rm = TRUE)
+```
+```{r, echo=FALSE}
+corr <- data.frame()
+for (i in 1:length(cols)) {
+  corr[cols[i],1] <- round(cor(data.frame(train_data$heart_disease_mortality_per_100k,
+                              train_data[,cols[i]]),
+                   use="complete.obs")[1,2],3)
+}
+
+corr <- cbind(cols, corr)
+colnames(corr) <- c("type", "cor")
+corr <- corr %>% arrange(desc(abs(cor)))
+
+corr %>% grid.table()
+```
+
+Each version was used in separate iterations of the predictive model, and surprisingly, the “base” version (prior to log10 conversion) showed marginally better predictive power.
+
+##Data Preparation for Predictive Modelling
+The features chosen for use in the predictive model are
+
+* Economic Typology (categorical)
+* Population (categorical)
+* Metropolitan Type (categorical)
+* Air Pollution concentration (categorical)
+* Percent of Civilian Labor (numeric)
+* Percent non-Hispanic African American (numeric)
+* Percent of Adult Physical Inactivity (numeric)
+* Percent of adults with less than a High School diploma (numeric)
+* Percent of adults with Bachelor’s Degree or higher (numeric)
+* Percent of adults that are obese and have diabetes (numeric)
+* Percent of adults that smoke and have diabetes (numeric)
+* Percent of adults that are obese, smoke, and have diabetes (numeric)
+* Homicides per 100,000 individuals (numeric)
+* Motor vehicle crash deaths per 100,000 individuals (numeric)
+
+In order to take advantage of predictive models in R, missing values need to be handled. The two choices would be to either remove rows with missing data, or to replace missing values with a constant value based on the characteristics of the feature.
+
+###Numeric data
+
+###Categorical
+Categorical data can be difficult when missing, as the con
