@@ -660,6 +660,87 @@ The features chosen for use in the predictive model are
 In order to take advantage of predictive models in R, missing values need to be handled. The two choices would be to either remove rows with missing data, or to replace missing values with a constant value based on the characteristics of the feature.
 
 ###Numeric data
+First we look at the number of records in the entire data set that are missing at least one of the chosen predictors
+
+```{r}
+model_cols <- c("econ__economic_typology",
+                "population", 
+                "metro",
+                "air_pollution",
+                "econ__pct_civilian_labor",
+                "demo__pct_non_hispanic_african_american",
+                "demo__pct_adults_bachelors_or_higher",
+                "demo__pct_adults_less_than_a_high_school_diploma",
+                "p_diab_obese",
+                "p_diab_smoke",
+                "p_all_three",
+                "health__homicides_per_100k",
+                "health__motor_vehicle_crash_deaths_per_100k")
+
+cont_cols <- model_cols[-c(1:4)]
+
+mval <- function(x) {
+  this_row <- train_data %>% filter(row_id==x) %>% 
+    select(row_id, cont_cols) %>% as.vector()
+  ifelse(length(which(is.na(this_row)))>0, this_row[1], 0)
+}
+
+missval <- sapply(train_data$row_id, mval, simplify = TRUE)
+
+length(which(missval!=0))
+length(train_data$row_id)
+```
+
+We see that well over 50% of the records have at least one numeric feature missing. This means that eliminating the records with missing data is not feasible. So the next step is to determine which value, per feature, makes the most sense as a substitute. Using the MEAN value of the feature makes sense if the data is relatively normal, while MEDIAN would work best for highly skewed data.  We produce histograms showing the distribution, mean and median for the numeric features to examine the normalcy:
+
+```{r, warning=FALSE}
+feat_means <- train_data %>% select(cont_cols) %>%
+  gather(feature, value) %>% group_by(feature) %>%
+  mutate(mn = mean(value, na.rm=TRUE), 
+         md = median(value, na.rm=TRUE))
+
+train_data %>% select(cont_cols) %>%
+  gather(feature, value) %>%
+  ggplot(aes(x=value)) + geom_histogram() +
+  geom_vline(aes(xintercept=mn), 
+             data = feat_means, linetype = "dashed", 
+             color = "green")+
+  geom_vline(aes(xintercept=md), 
+             data = feat_means, linetype = "dashed", 
+             color = "red")+
+  facet_wrap(~ feature, scales="free") +
+  xlab("green = mean; red = median")
+```
+
+For all features except for Percent of Civilian Labor, the data is skewed positive, and the median is not insignificantly different (lower) than the mean. So replacing NA values with the MEDIAN of the population would introduce the least bias to the data.
+
+```{r}
+#Replace NA with column median
+train_data <- train_data %>%
+  mutate_at(cont_cols, 
+            ~ifelse(is.na(.x), median(.x, na.rm = TRUE), .x))
+
+```
 
 ###Categorical
-Categorical data can be difficult when missing, as the con
+The number of records with NA in the categorical features is much different
+
+```{r}
+mval <- function(x) {
+  this_row <- train_data %>% filter(row_id==x) %>% 
+    select(row_id, model_cols[1:4]) %>% as.vector()
+  ifelse(length(which(is.na(this_row)))>0, this_row[1], 0)
+}
+
+missval_c <- sapply(train_data$row_id, mval, simplify = TRUE)
+
+length(which(missval_c!=0))
+```
+
+As less than 1% of records in the data set have NA in a chosen categorical feature, the best approach is to remove those records from the data set.
+
+```{r}
+train_data <- train_data[which(missval_c==0),]
+```
+
+

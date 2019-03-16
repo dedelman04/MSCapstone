@@ -60,31 +60,56 @@ model_cols <- c("econ__economic_typology",
 cont_cols <- model_cols[-c(1:4)]
 
 #How many rows have at least 1 missing numeric value?
-missval <- c()
-for (j in train_data$row_id){
-   missing_ind <- c()
-   missing_ind <- which(is.na(train_data[row_id==j, cont_cols]))
-   if(length(missing_ind > 0)) {missval[j] <- "Yes"}  
-}
 
 mval <- function(x) {
   this_row <- train_data %>% filter(row_id==x) %>% 
     select(row_id, cont_cols) %>% as.vector()
-  which(is.na(this_row))
+  ifelse(length(which(is.na(this_row)))>0, this_row[1], 0)
 }
 
-retval <- c()
-missval <- vapply(train_data$row_id, mval, FUN.VALUE=retval)
+missval <- sapply(train_data$row_id, mval, simplify = TRUE)
 
-which(length(missval)>0)
+length(which(missval!=0))
 
-#Replace NA with column mean
+#plot distros of numeric data
+train_data %>% select(cont_cols) %>%
+  gather(feature, value) %>%
+  ggplot(aes(y=value)) + geom_boxplot() + 
+  facet_wrap(~ feature, scales="free_y")
+
+feat_means <- train_data %>% select(cont_cols) %>%
+  gather(feature, value) %>% group_by(feature) %>%
+  mutate(mn = mean(value, na.rm=TRUE), md = median(value, na.rm=TRUE))
+
+train_data %>% select(cont_cols) %>%
+  gather(feature, value) %>%
+  ggplot(aes(x=value)) + geom_histogram() +
+  geom_vline(aes(xintercept=mn), data = feat_means, linetype = "dashed", color = "yellow")+
+  geom_vline(aes(xintercept=md), data = feat_means, linetype = "dashed", color = "red")+
+  facet_wrap(~ feature, scales="free") +
+  xlab("yellow = mean; red = median")
+
+#Replace NA with column median
 train_data <- train_data %>%
-  mutate_at(cont_cols, ~ifelse(is.na(.x), mean(.x, na.rm = TRUE), .x)) %>%
-  mutate_at(c("health__air_pollution_particulate_matter"), ~ifelse(is.na(.x), median(.x, na.rm=TRUE), .x))
+  mutate_at(cont_cols, ~ifelse(is.na(.x), median(.x, na.rm = TRUE), .x))
 
+#Categorical NAs
+mval <- function(x) {
+  this_row <- train_data %>% filter(row_id==x) %>% 
+    select(row_id, model_cols[1:4]) %>% as.vector()
+  ifelse(length(which(is.na(this_row)))>0, this_row[1], 0)
+}
+
+missval_c <- sapply(train_data$row_id, mval, simplify = TRUE)
+
+length(which(missval_c!=0))
+
+train_data <- train_data[which(missval_c==0),]
+
+#Linear regression model
 lm_form <- as.formula(paste("heart_disease_mortality_per_100k ~ ", paste(model_cols, collapse="+")))
 
+set.seed(1973)
 test_index <- createDataPartition(train_data$heart_disease_mortality_per_100k, times = 1, p=0.5, list=FALSE)
 train_set <- train_data[-test_index,]
 test_set <- train_data[test_index,]
@@ -92,6 +117,4 @@ test_set <- train_data[test_index,]
 fit <- lm(formula = lm_form, data = train_set)
 y_hat <- predict(fit, test_set)
 sqrt(mean((y_hat-test_set$heart_disease_mortality_per_100k)^2, na.rm=TRUE))
-
-median(train_data$health__air_pollution_particulate_matter, na.rm = TRUE)
 
