@@ -93,6 +93,10 @@ train_data %>% select(cont_cols) %>%
 train_data <- train_data %>%
   mutate_at(cont_cols, ~ifelse(is.na(.x), median(.x, na.rm = TRUE), .x))
 
+#Replace negative values with column median
+train_data <- train_data %>%
+  mutate_at(cont_cols, ~ifelse(.x < 0, median(.x, na.rm = TRUE), .x))
+
 #Categorical NAs
 mval <- function(x) {
   this_row <- train_data %>% filter(row_id==x) %>% 
@@ -106,15 +110,48 @@ length(which(missval_c!=0))
 
 train_data <- train_data[which(missval_c==0),]
 
+#Data normalization
+feat_means <- train_data %>% select(cont_cols) %>%
+  gather(feature, value) %>% group_by(feature) %>%
+  summarise(mn = mean(value, na.rm=TRUE), 
+            md = median(value, na.rm=TRUE),
+            sd = sd(value, na.rm=TRUE),
+            minval = min(value), maxval = max(value))
+
+xform <- train_data %>% select(cont_cols) %>%
+  gather(feature, value) %>% merge(y=feat_means, by="feature") %>%
+  mutate(cuberoot = value^(1/3), sqroot = sqrt(value), 
+         l10 = log10(value), natlog = log(value),
+         minmax = (value-minval)/(maxval-minval),
+         z = (value-mn)/sd)
+
+xform %>% ggplot(aes(x=cuberoot)) +geom_histogram()+
+  facet_wrap(~ feature, scale="free")
+
+xform %>% ggplot(aes(x=sqroot)) +geom_histogram()+
+  facet_wrap(~ feature, scale="free")
+
+xform %>% ggplot(aes(x=z)) +geom_histogram()+
+  facet_wrap(~ feature, scale="free")
+
 #Linear regression model
 lm_form <- as.formula(paste("heart_disease_mortality_per_100k ~ ", paste(model_cols, collapse="+")))
 
-set.seed(1973)
+set.seed(999)
 test_index <- createDataPartition(train_data$heart_disease_mortality_per_100k, times = 1, p=0.5, list=FALSE)
-train_set <- train_data[-test_index,]
-test_set <- train_data[test_index,]
+train_set <- train_data[-test_index, c("heart_disease_mortality_per_100k", model_cols)] 
+test_set <- train_data[test_index, c("heart_disease_mortality_per_100k", model_cols)]
 
 fit <- lm(formula = lm_form, data = train_set)
 y_hat <- predict(fit, test_set)
 sqrt(mean((y_hat-test_set$heart_disease_mortality_per_100k)^2, na.rm=TRUE))
 
+#Cross-validation
+x <- train_data %>% select(model_cols)
+y <- train_data$heart_disease_mortality_per_100k
+
+lm_fit <- train(x, y, method="lm", metric="RMSE")
+lm_fit$results
+
+glm_fit <- train(x, y, method="glm")
+glm_fit$results
