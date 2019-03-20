@@ -69,7 +69,33 @@ mval <- function(x) {
 
 missval <- sapply(train_data$row_id, mval, simplify = TRUE)
 
-length(which(missval!=0))
+mean(missval!=0)
+length(train_data$row_id)
+
+#Which predictors have most NA values
+pct_NA <- function(x) {
+#  colnames(x)
+#  NAcnt <- 
+    length(which(is.na(x)))
+#  c(col, NAcnt)
+}
+
+data.frame(
+  NAs = sapply(train_data[cont_cols], function(x){length(which(is.na(x)))}, simplify=TRUE)) %>% 
+  grid.table()
+
+data.frame(
+    NA_pct = 
+      #round(
+      format(
+      sapply(train_data[cont_cols], function(x){mean(ifelse(is.na(x), 1, 0))}, simplify=TRUE),
+      digits = 3)#* 100, 1)
+      ) %>% 
+  grid.table()
+
+
+length(which(is.na(train_data[cont_cols])))
+
 
 #plot distros of numeric data
 train_data %>% select(cont_cols) %>%

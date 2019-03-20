@@ -12,8 +12,8 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(data.table)
 library(ggplot2)
-path <- "/Users/edelmans/Documents/MSCapstone/"
-#path <- "C:/users/dedelman/desktop/capstone/"
+#path <- "/Users/edelmans/Documents/MSCapstone/"
+path <- "C:/users/dedelman/desktop/capstone/"
 train_df <- read.csv(file=paste0(path,"train_values.csv"),
                   header=TRUE,
                   stringsAsFactors = TRUE)
@@ -152,15 +152,14 @@ Due to heart disease mortality rates being distributed differently across the ec
 The individual values for “Area_RUCC” have populations ranging from < 100 to > 600, and histograms show that many distributions do not appear to be approximately normal.
 
 ```{r}
-plot <- ggplot(train_data,
-               aes(x=heart_disease_mortality_per_100k))+xlab("heart_mort_100k")+
-              geom_histogram(binwidth = (high_mort-low_mort)/40)
-plot <- plot+facet_wrap(~ area__rucc, ncol = 3)
-plot <- plot+geom_vline(linetype="dashed", xintercept = hd_mean, color = "blue")
-plot <- plot+geom_vline(linetype="dashed", xintercept = hd_med, color = "red")
-plot <- plot + annotate("text", x=hd_mean+40, y=55, label="<- mean", size=2.5, color = "blue")
-plot <- plot + annotate("text", x=hd_med-40, y=55, label="median ->", size=2.5, color = "red")
-plot
+train_data %>% ggplot(aes(x=heart_disease_mortality_per_100k))+
+  xlab("heart_mort_100k")+
+  geom_histogram(binwidth = (high_mort-low_mort)/40)+
+  facet_wrap(~ area__rucc, ncol = 3)+
+  geom_vline(linetype="dashed", xintercept = hd_mean, color = "blue")+
+  geom_vline(linetype="dashed", xintercept = hd_med, color = "red")+
+  annotate("text", x=hd_mean+40, y=55, label="<- mean", size=2.5, color = "blue")+
+  annotate("text", x=hd_med-40, y=55, label="median ->", size=2.5, color = "red")
 ```
 
 However, we can transform them into population groups as a proxy for Area_RUCC. The transformation is 
@@ -192,29 +191,30 @@ Looking at the histograms we now see a more even spread of data and more normal 
 
 ```{r}
 #Histograms by population groups
-plot <- ggplot(train_data,
-               aes(x=heart_disease_mortality_per_100k))+xlab("heart_mort_100k")+
-            geom_histogram(binwidth = (high_mort-low_mort)/40)
-plot <- plot+facet_wrap(~ population, ncol = 3)
-plot <- plot+geom_vline(linetype="dashed", xintercept = hd_mean, color = "blue")
-plot <- plot+geom_vline(linetype="dashed", xintercept = hd_med, color = "red")
-plot <- plot + annotate("text", x=hd_mean+40, y=75, label="<- mean", size=2.5, color = "blue")
-plot <- plot + annotate("text", x=hd_med-40, y=75, label="median ->", size=2.5, color = "red")
-plot
+train_data %>% ggplot(aes(x=heart_disease_mortality_per_100k))+
+  xlab("heart_mort_100k")+
+  geom_histogram(binwidth = (high_mort-low_mort)/40)+
+  facet_wrap(~ population, ncol = 3)+
+  geom_vline(linetype="dashed", xintercept = hd_mean, color = "blue")+
+  geom_vline(linetype="dashed", xintercept = hd_med, color = "red")+
+  annotate("text", x=hd_mean+40, y=75, label="<- mean", size=2.5, color = "blue")+
+  annotate("text", x=hd_med-40, y=75, label="median ->", size=2.5, color = "red")
 ```
 
 The “2.5-20K” group appears to be skewed somewhat positive, while the “1M+” group is skewed negative, even though the peak is below the population mean and median. Box plots show the distributions more cleanly.
 
 ```{r}
 #Box plot by population group
-plot <- ggplot(train_data,
-               aes(x=population, y=heart_disease_mortality_per_100k))+ xlab("")+
-  geom_boxplot()+ geom_hline(linetype="dashed", yintercept = hd_mean, color = "blue")
-plot <- plot+geom_hline(linetype="dashed", yintercept = hd_med, color = "red")
-plot <- plot + theme(axis.text.x = element_text(angle = 45, hjust=1, vjust=1)) + ggtitle("Population Groups")
-plot <- plot + annotate("text", x=.5, y=hd_mean+30, label="mean", size=3, color = "blue", angle=90)
-plot <- plot + annotate("text", x=5.5, y=hd_med-30, label="median", size=3, color = "red", angle=90)
-plot
+train_data %>%
+  ggplot(aes(x=population, y=heart_disease_mortality_per_100k))+
+  xlab("")+
+  geom_boxplot() +
+  geom_hline(linetype="dashed", yintercept = hd_mean, color = "blue")+
+  geom_hline(linetype="dashed", yintercept = hd_med, color = "red")+
+  theme(axis.text.x = element_text(angle = 45, hjust=1, vjust=1))+
+  ggtitle("Population Groups")+
+  annotate("text", x=.5, y=hd_mean+30, label="mean", size=3, color = "blue", angle=90)+
+  annotate("text", x=5.5, y=hd_med-30, label="median", size=3, color = "red", angle=90)
 ```
 
 Here we can more clearly see that the median for “under 2.5K”, “250K-1M” and “1M+” are all below the population mean and median. The group “2.5-20K” has a median well above the population mean and median, while the “20-250K” group median is only slightly higher than the population.
@@ -227,25 +227,25 @@ The analysis went one step further and grouped the RUCC values based on whether 
 
 ```{r}
 #Histograms by metro type
-plot <- ggplot(train_data,
-               aes(x=heart_disease_mortality_per_100k))+xlab("heart_mort_100k")+
-  geom_histogram(binwidth = (high_mort-low_mort)/40)
-plot <- plot+facet_wrap(~ metro, ncol = 3)
-plot <- plot+geom_vline(linetype="dashed", xintercept = hd_mean, color = "blue")
-plot <- plot+geom_vline(linetype="dashed", xintercept = hd_med, color = "red")
-plot <- plot + annotate("text", x=hd_mean+40, y=150, label="<- mean", size=2.5, color = "blue")
-plot <- plot + annotate("text", x=hd_med-40, y=150, label="median ->", size=2.5, color = "red")
-plot
+train_data %>% ggplot(aes(x=heart_disease_mortality_per_100k))+
+  xlab("heart_mort_100k")+
+  geom_histogram(binwidth = (high_mort-low_mort)/40)+
+  facet_wrap(~ metro, ncol = 3)+
+  geom_vline(linetype="dashed", xintercept = hd_mean, color = "blue")+
+  geom_vline(linetype="dashed", xintercept = hd_med, color = "red")+
+  annotate("text", x=hd_mean+40, y=150, label="<- mean", size=2.5, color = "blue")+
+  annotate("text", x=hd_med-40, y=150, label="median ->", size=2.5, color = "red")
 
 #Box plot by metro_type
-plot <- ggplot(train_data,
-               aes(x=metro, y=heart_disease_mortality_per_100k))+xlab("")+
-  geom_boxplot()+ geom_hline(linetype="dashed", yintercept = hd_mean, color = "blue")
-plot <- plot+geom_hline(linetype="dashed", yintercept = hd_med, color = "red")
-plot <- plot + theme(axis.text.x = element_text(angle = 45, hjust=1, vjust=1)) + ggtitle("Metropolitan Type")
-plot <- plot + annotate("text", x=.5, y=hd_mean+30, label="mean", size=3, color = "blue", angle=90)
-plot <- plot + annotate("text", x=2.5, y=hd_med-30, label="median", size=3, color = "red", angle=90)
-plot
+train_data %>% ggplot(aes(x=metro, y=heart_disease_mortality_per_100k))+
+  xlab("")+
+  geom_boxplot()+
+  geom_hline(linetype="dashed", yintercept = hd_mean, color = "blue")+
+  geom_hline(linetype="dashed", yintercept = hd_med, color = "red")+
+  theme(axis.text.x = element_text(angle = 45, hjust=1, vjust=1))+
+  ggtitle("Metropolitan Type")+
+  annotate("text", x=.5, y=hd_mean+30, label="mean", size=3, color = "blue", angle=90)+
+  annotate("text", x=2.5, y=hd_med-30, label="median", size=3, color = "red", angle=90)
 ```
 
 The box plots clearly show that metropolitan areas have a lower median than the population, while non-metropolitan areas skew higher than the population as a whole.
@@ -257,12 +257,11 @@ Ambient air pollution for the county is presented in the data set as a measure o
 
 ```{r}
 #Histogram for air pollution original
-plot <- ggplot(subset(train_data, !is.na(health__air_pollution_particulate_matter)),
-               aes(x=health__air_pollution_particulate_matter))+
-  geom_histogram(binwidth=1) + xlab("air pollution (mcg/m3)")
-plot <- plot + theme(axis.text.x = element_text(size=20))+
+train_data %>% subset(!is.na(health__air_pollution_particulate_matter)) %>%
+  ggplot(aes(x=health__air_pollution_particulate_matter))+
+  geom_histogram(binwidth=1) + xlab("air pollution (mcg/m3)")+
+  theme(axis.text.x = element_text(size=20))+
   ggtitle("(A)")+theme(plot.title = element_text(hjust=0.5))
-plot
 
 #Histogram for air pollution regrouped
 cut_labels <- c("<= 10", "11", "12", "13", "14+")
@@ -271,12 +270,11 @@ cut_levels <- c(0, 10.9, 11.9, 12.9, 13.9, 100)
 train_data$air_pollution <- cut(train_data$health__air_pollution_particulate_matter, cut_levels)
 levels(train_data$air_pollution) <- cut_labels
 
-plot <- ggplot(subset(train_data, !is.na(air_pollution)),
-               aes(x=air_pollution))+
-  geom_bar() + xlab("air pollution (mcg/m3)")
-plot <- plot + theme(axis.text.x = element_text(size=20))+
+train_data %>% subset(!is.na(air_pollution)) %>%
+  ggplot(aes(x=air_pollution))+
+  geom_bar() + xlab("air pollution (mcg/m3)")+
+  theme(axis.text.x = element_text(size=20))+
   ggtitle("(B)")+theme(plot.title = element_text(hjust=0.5))
-plot
 ```
 
 Using the new groups, histograms and boxplots show the spreads to be approximately normal, with some groups skewing below the population mean and some above. The group with 12 µg/m^3^ shows a mean just at the population mean, with a median slightly lower.
@@ -546,13 +544,13 @@ Thinking about the 3 health percentages:
 * Percent of diabetes
 we can say that each of the percentages is the same as the probability of a randomly chosen individual in that county having the specific condition. Let us further assume that each of the events (being obese, smoking, having diabetes) are independent of each other. According to probability theory, the probability of two independent events occurring is simply the product of the two individual probabilities. Therefore
 
-$P(diabetes & obese) = P(diabetes) * P(obese)$
+$$P(diabetes & obese) = P(diabetes) * P(obese)$$
 
-$P(diabetes & smoking) = P(diabetes) * P(smoking)$
+$$P(diabetes & smoking) = P(diabetes) * P(smoking)$$
 
-$P(obese & smoking) = P (obese) * P(smoking)$
+$$P(obese & smoking) = P (obese) * P(smoking)$$
 
-$P(obese & smoking & diabetes) = P(obese) * P(smoking) * P(diabetes)$
+$$P(obese & smoking & diabetes) = P(obese) * P(smoking) * P(diabetes)$$
 
 By calculating these combined probabilities, we find features that have even stronger correlation that each individual feature
 ```{r}
@@ -679,6 +677,7 @@ model_cols <- c("econ__economic_typology",
 
 cont_cols <- model_cols[-c(1:4)]
 
+#How many rows have at least 1 missing numeric value?
 mval <- function(x) {
   this_row <- train_data %>% filter(row_id==x) %>% 
     select(row_id, cont_cols) %>% as.vector()
@@ -687,11 +686,22 @@ mval <- function(x) {
 
 missval <- sapply(train_data$row_id, mval, simplify = TRUE)
 
-length(which(missval!=0))
-length(train_data$row_id)
+mean(missval!=0)  ##Percentage of rows with missing values
+
 ```
 
-We see that well over 50% of the records have at least one numeric feature missing. This means that eliminating the records with missing data is not feasible. So the next step is to determine which value, per feature, makes the most sense as a substitute. Using the MEAN value of the feature makes sense if the data is relatively normal, while MEDIAN would work best for highly skewed data.  We produce histograms showing the distribution, mean and median for the numeric features to examine the normalcy:
+We see that well over 50% of the records have at least one numeric feature missing. This means that eliminating the records with missing data is not feasible. So the next step is to determine if a small number of predictors is contributing the majority of the missing values, in which case we can remove the predictor.
+
+```{r}
+#Which features have most NAs
+data.frame(
+  NA_pct = sapply(train_data[cont_cols],
+                  function(x){mean(ifelse(is.na(x), 1, 0))},
+                  simplify=TRUE))
+```
+
+
+which value, per feature, makes the most sense as a substitute. Using the MEAN value of the feature makes sense if the data is relatively normal, while MEDIAN would work best for highly skewed data.  We produce histograms showing the distribution, mean and median for the numeric features to examine the normalcy:
 
 ```{r, warning=FALSE}
 feat_means <- train_data %>% select(cont_cols) %>%
