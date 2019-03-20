@@ -11,6 +11,21 @@ train_data %>% select(heart_disease_mortality_per_100k, cols) %>%
   geom_smooth(method="lm", na.rm = TRUE)+xlab("percent")
 #  scale_x_continuous(labels=scales::percent)
 
+cols <- colnames(train_data)[c(like(colnames(train_data), "pct") | 
+                               like(colnames(train_data), "per"))]
+
+#cols <- colnames(train_data)[!c(like(colnames(train_data), "pct") | 
+#                                 like(colnames(train_data), "per"))]
+
+#Get correlation for each selected column
+data.frame(
+  feature=names(train_data[cols]),
+  corr = sapply(train_data[cols], function(x) {
+    cor(data.frame(train_data$heart_disease_mortality_per_100k, x),
+        use="complete.obs")[1,2] })
+) %>% arrange(desc(abs(corr)))
+
+#Old method
 corr <- data.frame()
 for (i in 1:length(cols)) {
   corr[cols[i],1] <- round(cor(data.frame(train_data$heart_disease_mortality_per_100k,
@@ -18,11 +33,13 @@ for (i in 1:length(cols)) {
                    use="complete.obs")[1,2],3)
 }
 
+
 corr <- cbind(cols, corr)
 colnames(corr) <- c("type", "cor")
 corr <- corr %>% arrange(desc(abs(cor)))
 
 corr %>% grid.table()
+##
 
 train_data <- train_data %>% 
   mutate(econ_factor = 
@@ -35,8 +52,8 @@ train_data <- train_data %>%
 
 #levels(train_data$econ_factor) <- c("Below Mean", "No Diff", "Above Mean")
 
-train_data %>% ggplot(aes(x=demo__pct_adults_less_than_a_high_school_diploma, y=heart_disease_mortality_per_100k))+
-  geom_point(aes(color = econ__economic_typology))
+train_data %>% ggplot(aes(x=health__pct_adult_obesity, y=heart_disease_mortality_per_100k))+
+  geom_point(aes(color = econ__economic_typology))+
   geom_hline(linetype="dashed", yintercept = hd_mean, color = "blue")+
   geom_hline(linetype="dashed", yintercept = hd_med, color = "red")
 
@@ -55,7 +72,10 @@ model_cols <- c("econ__economic_typology",
                 "p_diab_smoke",
                 "p_all_three",
                 "health__homicides_per_100k",
-                "health__motor_vehicle_crash_deaths_per_100k")
+                "health__motor_vehicle_crash_deaths_per_100k",
+                "health__pct_adult_obesity",
+                "health__pct_diabetes",
+                "health__pct_adult_smoking")
 
 cont_cols <- model_cols[-c(1:4)]
 
@@ -73,29 +93,26 @@ mean(missval!=0)
 length(train_data$row_id)
 
 #Which predictors have most NA values
-pct_NA <- function(x) {
-#  colnames(x)
-#  NAcnt <- 
-    length(which(is.na(x)))
-#  c(col, NAcnt)
-}
-
 data.frame(
   NAs = sapply(train_data[cont_cols], function(x){length(which(is.na(x)))}, simplify=TRUE)) %>% 
   grid.table()
 
+#Model continuous features
 data.frame(
     NA_pct = 
-      #round(
       format(
       sapply(train_data[cont_cols], function(x){mean(ifelse(is.na(x), 1, 0))}, simplify=TRUE),
-      digits = 3)#* 100, 1)
+      digits = 3)
       ) %>% 
   grid.table()
 
-
-length(which(is.na(train_data[cont_cols])))
-
+#All features
+data.frame(
+  features = colnames(train_data %>% select(-heart_disease_mortality_per_100k)),
+  NA_pct = 
+      sapply(train_data %>% select(-heart_disease_mortality_per_100k),
+             function(x){mean(ifelse(is.na(x), 1, 0))}, simplify=TRUE)
+) %>% arrange(desc(NA_pct))
 
 #plot distros of numeric data
 train_data %>% select(cont_cols) %>%

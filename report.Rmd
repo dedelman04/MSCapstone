@@ -92,7 +92,7 @@ While building and tuning the predictive model, the following features were deem
 Heart Disease Mortality Rate (herein shown with a unit of “deaths per 100,000 population”) in the given data set showed a mean of 279.4, median of 275.0, and standard deviation of 59.0 with a range of 109.0 – 512.0. A histogram with 40 equal bins (calculated based on the minimum and maximum values) and a box plot both show that heart disease mortality rate is approximately normal (skewed very slightly positive), with only approximately 10-15 outliers (values outside of the Inner Quartile Range of 237 – 317).
 
 ```{r}
-#Historgram & boxplot
+#Histogram & boxplot
 train_data %>% ggplot(aes(x=heart_disease_mortality_per_100k))+geom_histogram(bins=40)+
   xlab("heart_mort_100k")+
   geom_vline(linetype = "dashed", color = "purple", xintercept = hd_med)+
@@ -328,8 +328,15 @@ train_data %>% select(heart_disease_mortality_per_100k, cols) %>%
   facet_wrap(~ data_type, ncol=ncol, scales="free_x")+xlab("percent")+
   geom_smooth(method="lm", na.rm = TRUE)
 
+data.frame(
+  feature=names(train_data[cols]),
+  corr = sapply(train_data[cols], function(x) {
+    cor(data.frame(train_data$heart_disease_mortality_per_100k, x),
+        use="complete.obs")[1,2] })
+  ) %>% arrange(desc(abs(corr)))
+
 ```
-```{r}
+```{r, echo=FALSE, eval=FALSE}
 corr <- data.frame()
 for (i in 1:length(cols)) {
   corr[cols[i],1] <- round(cor(data.frame(train_data$heart_disease_mortality_per_100k,
@@ -400,8 +407,16 @@ train_data %>% select(heart_disease_mortality_per_100k, cols) %>%
   ggplot(aes(x=val, y= heart_disease_mortality_per_100k))+geom_point(na.rm = TRUE)+
   facet_wrap(~ data_type, ncol=ncol, scales="fixed")+xlab("percent")+
   geom_smooth(method="lm", na.rm = TRUE)
+
+data.frame(
+  feature=names(train_data[cols]),
+  corr = sapply(train_data[cols], function(x) {
+    cor(data.frame(train_data$heart_disease_mortality_per_100k, x),
+        use="complete.obs")[1,2] })
+  ) %>% arrange(desc(abs(corr)))
+
 ```
-```{r}
+```{r, echo=FALSE, eval=FALSE}
 corr <- data.frame()
 for (i in 1:length(cols)) {
   corr[cols[i],1] <- round(cor(data.frame(train_data$heart_disease_mortality_per_100k,
@@ -479,8 +494,16 @@ train_data %>% select(heart_disease_mortality_per_100k, cols) %>%
   ggplot(aes(x=val, y= heart_disease_mortality_per_100k))+geom_point(na.rm = TRUE)+
   facet_wrap(~ data_type, ncol=ncol, scales="fixed")+xlab("percent")+
   geom_smooth(method="lm", na.rm = TRUE)
+
+data.frame(
+  feature=names(train_data[cols]),
+  corr = sapply(train_data[cols], function(x) {
+    cor(data.frame(train_data$heart_disease_mortality_per_100k, x),
+        use="complete.obs")[1,2] })
+  ) %>% arrange(desc(abs(corr)))
+
 ```
-```{r}
+```{r, echo=FALSE, eval=FALSE}
 corr <- data.frame()
 for (i in 1:length(cols)) {
   corr[cols[i],1] <- round(cor(data.frame(train_data$heart_disease_mortality_per_100k,
@@ -575,6 +598,15 @@ train_data %>% select(heart_disease_mortality_per_100k, cols) %>%
   ggplot(aes(x=val, y= heart_disease_mortality_per_100k))+geom_point(na.rm = TRUE)+
   facet_wrap(~ data_type, ncol=ncol, scales="fixed")+xlab("percent")+
   geom_smooth(method="lm", na.rm = TRUE)
+```
+```{r, echo=FALSE}
+data.frame(
+  feature=names(train_data[cols]),
+  corr = sapply(train_data[cols], function(x) {
+    cor(data.frame(train_data$heart_disease_mortality_per_100k, x),
+        use="complete.obs")[1,2] })
+  ) %>% arrange(desc(abs(corr)))
+
 ```
 ```{r, echo=FALSE}
 corr <- data.frame()
