@@ -11,19 +11,57 @@ train_data %>% select(heart_disease_mortality_per_100k, cols) %>%
   geom_smooth(method="lm", na.rm = TRUE)+xlab("percent")
 #  scale_x_continuous(labels=scales::percent)
 
-cols <- colnames(train_data)[c(like(colnames(train_data), "pct") | 
-                               like(colnames(train_data), "per"))]
+#Continuous columns
+num_cols <- train_data %>% 
+  select(-c(row_id, heart_disease_mortality_per_100k)) %>%
+  .[sapply(., is.numeric)] %>% 
+  colnames()
+  
 
-#cols <- colnames(train_data)[!c(like(colnames(train_data), "pct") | 
-#                                 like(colnames(train_data), "per"))]
+#Categorical columns
+cat_cols <- colnames(train_data)[sapply(train_data, is.factor)]
 
-#Get correlation for each selected column
-data.frame(
-  feature=names(train_data[cols]),
-  corr = sapply(train_data[cols], function(x) {
-    cor(data.frame(train_data$heart_disease_mortality_per_100k, x),
-        use="complete.obs")[1,2] })
-) %>% arrange(desc(abs(corr)))
+get_corr <- function(x) {
+  cor(data.frame(train_data$heart_disease_mortality_per_100k, x),
+      use="complete.obs")[1,2] }
+
+#Get correlation for each numeric column
+data.frame(feature=num_cols,
+           corr = sapply(train_data[num_cols], get_corr)) %>% 
+  arrange(desc(abs(corr)))
+
+multi_plot <- function(x) {
+train_data %>% select(heart_disease_mortality_per_100k, colnames(x), cat_cols) %>%
+  gather(category, value, -c(heart_disease_mortality_per_100k, colnames(x))) %>%
+  ggplot(aes(x=x, y=heart_disease_mortality_per_100k))+
+  facet_wrap(~ category) + geom_point(aes(color=value))
+}
+
+tmp <- lapply(names(train_data[num_cols]), 
+       function(x) {
+        train_data %>% select(heart_disease_mortality_per_100k, x, cat_cols) %>%
+           gather(category, value, -c(heart_disease_mortality_per_100k, x)) %>%
+           ggplot(aes(x=x, y=heart_disease_mortality_per_100k))+
+           facet_wrap(~ category) + geom_point(aes(color=value))
+         
+       })
+
+tmp <- train_data %>% select(heart_disease_mortality_per_100k, demo__pct_adults_bachelors_or_higher, cat_cols) %>%
+  gather(category, value, -c(heart_disease_mortality_per_100k, demo__pct_adults_bachelors_or_higher))
+ggplot(data = tmp, aes(x=demo__pct_adults_bachelors_or_higher, y=heart_disease_mortality_per_100k))+
+  facet_wrap(~ category) + geom_point(aes(color=value))
+
+#Cross each numeric feature with each categorical feature and get correlation
+cross_cols <- paste(rep(num_cols, each=length(cat_cols)), cat_cols, sep="+")
+
+data.frame(feature=cross_cols,
+           corr = sapply(train_data[num_cols], get_corr)) %>% 
+  arrange(desc(abs(corr)))
+
+cor(data.frame(train_data$heart_disease_mortality_per_100k, 
+               data.frame(train_data$econ__pct_civilian_labor,
+                          ifelse(train_data$metro == "Metro", TRUE, FALSE ))))
+                          #train_data$metro)))
 
 #Old method
 corr <- data.frame()
@@ -52,8 +90,10 @@ train_data <- train_data %>%
 
 #levels(train_data$econ_factor) <- c("Below Mean", "No Diff", "Above Mean")
 
-train_data %>% ggplot(aes(x=health__pct_adult_obesity, y=heart_disease_mortality_per_100k))+
-  geom_point(aes(color = econ__economic_typology))+
+train_data %>% mutate(pop = ifelse(population %in% c("under 2.5k", "2.5-20k", "20-250k"),
+                                   "Small", "Large")) %>%
+  ggplot(aes(x=health__pct_physical_inactivity, y=heart_disease_mortality_per_100k))+
+  geom_point(aes(color = metro))+
   geom_hline(linetype="dashed", yintercept = hd_mean, color = "blue")+
   geom_hline(linetype="dashed", yintercept = hd_med, color = "red")
 
