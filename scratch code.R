@@ -30,26 +30,24 @@ data.frame(feature=num_cols,
            corr = sapply(train_data[num_cols], get_corr)) %>% 
   arrange(desc(abs(corr)))
 
+#Plot all numerics faceted by categorical variable and colored by cat value
+#To look for possible clusters
 multi_plot <- function(x) {
 train_data %>% select(heart_disease_mortality_per_100k, colnames(x), cat_cols) %>%
   gather(category, value, -c(heart_disease_mortality_per_100k, colnames(x))) %>%
-  ggplot(aes(x=x, y=heart_disease_mortality_per_100k))+
-  facet_wrap(~ category) + geom_point(aes(color=value))
+  ggplot(aes(x=get(x), y=heart_disease_mortality_per_100k))+
+  facet_wrap(~ category) + geom_point(aes(color=value)) + xlab(x)
 }
 
 tmp <- lapply(names(train_data[num_cols]), 
        function(x) {
-        train_data %>% select(heart_disease_mortality_per_100k, x, cat_cols) %>%
+         train_data %>% select(heart_disease_mortality_per_100k, x, cat_cols) %>%
            gather(category, value, -c(heart_disease_mortality_per_100k, x)) %>%
-           ggplot(aes(x=x, y=heart_disease_mortality_per_100k))+
-           facet_wrap(~ category) + geom_point(aes(color=value))
+           ggplot(aes(x=get(x), y=heart_disease_mortality_per_100k))+
+           facet_wrap(~ category) + geom_point(aes(color=value)) +xlab(x)
          
        })
 
-tmp <- train_data %>% select(heart_disease_mortality_per_100k, demo__pct_adults_bachelors_or_higher, cat_cols) %>%
-  gather(category, value, -c(heart_disease_mortality_per_100k, demo__pct_adults_bachelors_or_higher))
-ggplot(data = tmp, aes(x=demo__pct_adults_bachelors_or_higher, y=heart_disease_mortality_per_100k))+
-  facet_wrap(~ category) + geom_point(aes(color=value))
 
 #Cross each numeric feature with each categorical feature and get correlation
 cross_cols <- paste(rep(num_cols, each=length(cat_cols)), cat_cols, sep="+")
