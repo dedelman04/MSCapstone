@@ -145,12 +145,23 @@ data.frame(
   grid.table()
 
 #All features
-data.frame(
+NAs <- data.frame(
   features = colnames(train_data %>% select(-heart_disease_mortality_per_100k)),
   NA_pct = 
-      sapply(train_data %>% select(-heart_disease_mortality_per_100k),
-             function(x){mean(ifelse(is.na(x), 1, 0))}, simplify=TRUE)
-) %>% arrange(desc(NA_pct))
+      as.numeric(
+       format( sapply(train_data %>% select(-heart_disease_mortality_per_100k),
+             function(x){mean(ifelse(is.na(x), 1, 0))}, simplify=TRUE)*100, digits=3) 
+      )
+) 
+NAs %>% arrange(desc(NA_pct))
+
+na2 <- as.vector(NAs$features[NAs$NA_pct == 0.0625])
+str(train_data %>% select(as.vector(NAs$features[NAs$NA_pct == 0.0625]))) %>%
+
+min_missing <- min(NAs %>% filter(NA_pct > 0) %>% select(NA_pct))  
+sapply(train_data %>% 
+         select(as.vector(NAs$features[NAs$NA_pct == min_missing])),
+       function(x){which(is.na(x))}, simplify=TRUE)
 
 #plot distros of numeric data
 train_data %>% select(cont_cols) %>%

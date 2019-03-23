@@ -12,8 +12,8 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(data.table)
 library(ggplot2)
-#path <- "/Users/edelmans/Documents/MSCapstone/"
-path <- "C:/users/dedelman/desktop/capstone/"
+path <- "/Users/edelmans/Documents/MSCapstone/"
+#path <- "C:/users/dedelman/desktop/capstone/"
 train_df <- read.csv(file=paste0(path,"train_values.csv"),
                   header=TRUE,
                   stringsAsFactors = TRUE)
@@ -29,6 +29,12 @@ high_mort <- as.integer(max(train_data$heart_disease_mortality_per_100k))
 hd_mean = mean(train_data$heart_disease_mortality_per_100k)
 hd_med = median(train_data$heart_disease_mortality_per_100k)
 
+train_data <- train_data %>% 
+  mutate(health__pct_physical_inactivity = health__pct_physical_inacticity) %>%
+  select(-health__pct_physical_inacticity)
+
+```
+```{r, eval=FALSE, echo=FALSE}
 train_data <- train_data %>% mutate(metro = ifelse(like(area__rucc, "Nonmetro"), "Nonmetro", "Metro"))
 
 train_data <- train_data %>% 
@@ -53,9 +59,6 @@ levels(train_data$area__rucc) <- c("Metro - 1 Million +",
                                   "Nonmetro - 20,000 or more, non-adjacent"
                                   )
 
-train_data <- train_data %>% 
-  mutate(health__pct_physical_inactivity = health__pct_physical_inacticity) %>%
-  select(-health__pct_physical_inacticity)
 
 ```
 
@@ -89,7 +92,7 @@ While building and tuning the predictive model, the following features were deem
 ## Data Exploration and Initial Analysis
 ### Heart Disease Mortality Rate
 #### Descriptive Statistics
-Heart Disease Mortality Rate (herein shown with a unit of “deaths per 100,000 population”) in the given data set showed a mean of 279.4, median of 275.0, and standard deviation of 59.0 with a range of 109.0 – 512.0. A histogram with 40 equal bins (calculated based on the minimum and maximum values) and a box plot both show that heart disease mortality rate is approximately normal (skewed very slightly positive), with only approximately 10-15 outliers (values outside of the Inner Quartile Range of 237 – 317).
+Heart Disease Mortality Rate (herein shown with a unit of “deaths per 100,000 population”) in the given data set showed a mean of 279.4, median of 275.0, and standard deviation of 59.0 with a range of 109.0 – 512.0, across 3198 observations. A histogram with 40 equal bins (calculated based on the minimum and maximum values) and a box plot both show that heart disease mortality rate is approximately normal (skewed very slightly positive), with only approximately 10-15 outliers (values outside of the Inner Quartile Range of 237 – 317).
 
 ```{r}
 #Histogram & boxplot
@@ -104,6 +107,73 @@ train_data %>% ggplot(aes(y=heart_disease_mortality_per_100k))+geom_boxplot()+
   geom_hline(linetype = "dashed", color = "blue", yintercept = hd_mean)+
   theme(axis.text.x=element_blank())
 ```
+
+#### Initial Analysis of Predictors
+##### Predictor Types
+The data set includes 32 values for each rows (ignoring "row_id"), 29 of which are numeric
+
+```{r}
+#Numeric columns
+num_cols <- train_data %>% 
+  select(-c(row_id, heart_disease_mortality_per_100k)) %>%
+  .[sapply(., is.numeric)] %>% 
+  colnames()
+
+#Categorical columns
+cat_cols <- colnames(train_data)[sapply(train_data, is.factor)]
+
+length(num_cols)
+length(cat_cols)
+```
+
+(the column "yr" will also be ignored as it has 2 values, "a" and "b", which are merely placeholders)
+
+##### Missing feature values
+In a data set of this size, missing data can adversely affect the predictive value of individual features, so we look for any features that have a significant percentage of missing data
+
+```{r}
+NAs <- data.frame(
+  features = colnames(train_data %>% select(-heart_disease_mortality_per_100k, -yr, -row_id)),
+  NA_pct = 
+      format(sapply(train_data %>%
+                      select(-heart_disease_mortality_per_100k,
+                             -yr, -row_id),
+             function(x){mean(ifelse(is.na(x), 1, 0))},
+             simplify=TRUE)*100, digits=3) 
+) %>% arrange(desc(NA_pct))
+
+NAs
+```
+
+We will remove predictors from the data set that have more than 10% missing values
+* health__homicides_per_100k
+* health__pct_excessive_drinking
+* health__pct_adult_smoking
+* health__motor_vehicle_crash_deaths_per_100k
+
+```{r}
+train_data <- train_data %>% select(-health__homicides_per_100k,
+                                   -health__pct_excessive_drinking,
+                                  -health__pct_adult_smoking,
+                      -health__motor_vehicle_crash_deaths_per_100k)
+```
+
+12 predictors have 0.0625% missing values, which equates to 2 rows. If it is the same two rows that are missing all of the predictors, we will just remove those rows from the data set.
+
+```{r}
+min_missing <- min(NAs %>% filter(NA_pct > 0) %>% select(NA_pct))  
+sapply(train_data %>% 
+        select(as.vector(NAs$features[NAs$NA_pct == min_missing])),
+       function(x){which(is.na(x))}, simplify=TRUE)
+```
+
+We see that index 1090 and 1251 are missing all of the selected predictors, so we will remove them from the data set
+
+```{r}
+train_data <- train_data[-c(1090, 1251), ]
+```
+
+For the remaining NA values, we will decide how to handle after some exploratory data analysis of the features.
 
 #### Distributions Across Categorical Features
 ##### Economic Typology

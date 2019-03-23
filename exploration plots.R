@@ -9,8 +9,8 @@ library(caret)
 ###BEGIN DATA LOAD WORK
 #######################
 
-#path <- "/Users/edelmans/Documents/MSCapstone/"
-path <- "C:/users/dedelman/desktop/capstone/"
+path <- "/Users/edelmans/Documents/MSCapstone/"
+#path <- "C:/users/dedelman/desktop/capstone/"
 train_df <- read.csv(file=paste0(path,"train_values.csv"),
                      header=TRUE,
                      stringsAsFactors = TRUE)
