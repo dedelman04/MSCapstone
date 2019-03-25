@@ -14,8 +14,8 @@ library(data.table)
 library(ggplot2)
 library(gridExtra)
 library(grid)
-path <- "/Users/edelmans/Documents/MSCapstone/"
-#path <- "C:/users/dedelman/desktop/capstone/"
+#path <- "/Users/edelmans/Documents/MSCapstone/"
+path <- "C:/users/dedelman/desktop/capstone/"
 train_df <- read.csv(file=paste0(path,"train_values.csv"),
                   header=TRUE,
                   stringsAsFactors = TRUE)
@@ -122,11 +122,11 @@ In a data set of this size, missing data can adversely affect the predictive val
 NAs <- data.frame(
   features = colnames(train_data %>% select(-heart_disease_mortality_per_100k, -yr, -row_id)),
   NA_pct = 
-      format(sapply(train_data %>%
+      as.numeric(format(sapply(train_data %>%
                       select(-heart_disease_mortality_per_100k,
                              -yr, -row_id),
              function(x){mean(ifelse(is.na(x), 1, 0))},
-             simplify=TRUE)*100, digits=3) 
+             simplify=TRUE)*100, digits=3) )
 ) 
 
 #Show NA percentage from highest to lowest
@@ -134,6 +134,7 @@ NAs %>% arrange(desc(NA_pct))
 ```
 
 We will remove predictors from the data set that have more than 10% missing values. This turns out to be
+
 *health__homicides_per_100k
 *health__pct_excessive_drinking
 *health__pct_adult_smoking
@@ -173,12 +174,12 @@ For the remaining NA values, we will decide how to handle after some exploratory
 ##### Economic Typology
 The 6 economic typologies used by the USDA Economic Research Service to assign to each county are
 
-*Farm-dependent
-*Federal/State government-dependent
-*Manufacturing-dependent
-*Mining-dependent
-*Non-specialized
-*Recreation
+* Farm-dependent
+* Federal/State government-dependent
+* Manufacturing-dependent
+* Mining-dependent
+* Non-specialized
+* Recreation
 
 The typologies speak to the main type of industries of a particular county. So while we don’t have the specific industries in each county (knowing, intellectually, that certain industries have been linked in the past to specific conditions, including heart disease), we can use the typology as a good representative proxy for specific industries. To identify any potential relationship between typology and heart disease mortality, we use histograms and box plots to examine each typology for an abnormal or skewed distribution.
 
@@ -217,19 +218,19 @@ bind_rows(train_data %>% select(heart_disease_mortality_per_100k,
             md = median(heart_disease_mortality_per_100k)) %>%
   mutate(MeanAboveBelow = ifelse(round(mn,1) < round(hd_mean,1), 
                               "Below",
-                             ifelse(round(mn,1) = round(hd_mean,1),
+                             ifelse(round(mn,1) == round(hd_mean,1),
                               "Equal", "Above")),
          MedianAboveBelow = ifelse(round(md,1) < round(hd_med,1),
                                "Below",
-                             ifelse(round(md,1) = round(hd_med,1),
+                             ifelse(round(md,1) == round(hd_med,1),
                               "Equal", "Above")))%>%
   select(econ__economic_typology, mn, 
          MeanAboveBelow, md, MedianAboveBelow)
-  , data.frame(econ__economic_typology = "Population",
+  , data.frame(econ__economic_typology = "Total Population Values",
                mn= hd_mean, 
-               MeanAboveBelow = "",
+               MeanAboveBelow = "_",
                md = hd_med,
-               MedianAboveBelow = "")
+               MedianAboveBelow = "_")
 )
 ```
 
@@ -278,16 +279,11 @@ grid.table(rucc_tab)
 #Add "population" column using mapping
 #Note - 2 different patterns map to 20-250k
 train_data <- train_data %>% 
-  mutate(population = ifelse(like(train_data$area__rucc,
-                                  "19,999"), "2.5-20k",
-                      ifelse(like(train_data$area__rucc,
-                                  "2.5k"), "under 2.5k",
-                      ifelse(like(train_data$area__rucc,
-                                  "20,000"), "20-250k",
-                      ifelse(like(train_data$area__rucc,
-                                  "fewer than 250,000"), "20-250k",
-                      ifelse(like(train_data$area__rucc,
-                                  "250,000"), "250k-1M",
+  mutate(population = ifelse(like(train_data$area__rucc, "19,999"), "2.5-20k",
+                      ifelse(like(train_data$area__rucc, "2.5k"), "under 2.5k",
+                      ifelse(like(train_data$area__rucc, "20,000"), "20-250k",
+                      ifelse(like(train_data$area__rucc, "fewer than 250,000"), "20-250k",
+                      ifelse(like(train_data$area__rucc, "250,000"), "250k-1M",
                          "1M+"))))))
 
 #Force population into a factor
@@ -346,11 +342,11 @@ bind_rows(train_data %>% select(heart_disease_mortality_per_100k,
                                    ifelse(round(md,1) == hd_med,
                                           "Equal", "Above"))) %>%
   select(population, mn, MeanAboveBelow, md, MedianAboveBelow)
-  , data.frame(population = "Population", 
+  , data.frame(population = "Total Population Values", 
                mn= hd_mean, 
-               MeanAboveBelow = "",
+               MeanAboveBelow = "_",
                md = hd_med,
-               MedianAboveBelow = "")
+               MedianAboveBelow = "_")
 )
 ```
 
@@ -386,7 +382,7 @@ train_data %>% ggplot(aes(x=metro, y=heart_disease_mortality_per_100k))+
   annotate("text", x=2.5, y=hd_med-30, label="median", size=3, color = "red", angle=90)
 ```
 
-The box plots clearly show that metropolitan areas have a lower median than the population, while non-metropolitan areas skew higher than the population as a whole.
+The box plots clearly show that metropolitan areas have a lower median than the population, while non-metropolitan areas skew higher than the population as a whole, making this a good cadidate for the predictive model.
 
 ```{r, warning=FALSE}
 bind_rows(train_data %>% select(heart_disease_mortality_per_100k,
@@ -402,26 +398,39 @@ bind_rows(train_data %>% select(heart_disease_mortality_per_100k,
                                    "Below",
                                    ifelse(round(md,1) == hd_med,
                                           "Equal", "Above"))) %>%
-  select(population, mn, MeanAboveBelow, md, MedianAboveBelow)
-  , data.frame(metro = "Population", 
+  select(metro, mn, MeanAboveBelow, md, MedianAboveBelow)
+  , data.frame(metro = "Total Population Values", 
                mn= hd_mean, 
-               MeanAboveBelow = "",
+               MeanAboveBelow = "_",
                md = hd_med,
-               MedianAboveBelow = "")
+               MedianAboveBelow = "_")
 )
 ```
 
 ##### Air Pollution
-Ambient air pollution for the county is presented in the data set as a measure of the concentration of fine particulate matter, as measured in µg/m^3^. These figures were presented as positive integers, so as a feature of the data set it is more akin to a categorical variable.  The initial spread of values showed a large discrepancy in population size, especially in the min and max regions (A), so values were grouped into a smaller number of populations that were closer in size (B)
+Ambient air pollution for the county is presented in the data set as a measure of the concentration of fine particulate matter, as measured in µg/m^3^. These figures were presented as positive integers, so as a feature of the data set it is more akin to a categorical variable. Figure A shows the distribution of values.
+
+Air Pollution has 0.88% NAs in the data set (28 rows), so based on figure A, we should be able to set the NAs to the median value without introducing much bias.
+
 
 ```{r}
 #Histogram for air pollution original
-train_data %>% subset(!is.na(health__air_pollution_particulate_matter)) %>%
+train_data %>% filter(!is.na(health__air_pollution_particulate_matter)) %>%
   ggplot(aes(x=health__air_pollution_particulate_matter))+
-  geom_histogram(binwidth=1) + xlab("air pollution (mcg/m3)")+
+  geom_histogram(binwidth=1) + xlab("air pollution (µg/m^3)")+
   theme(axis.text.x = element_text(size=20))+
   ggtitle("(A)")+theme(plot.title = element_text(hjust=0.5))
 
+#Find median, replace NA values with median of population
+ap_med <- median(train_data$health__air_pollution_particulate_matter, na.rm=TRUE)
+ap_NA <- which(is.na(train_data$health__air_pollution_particulate_matter))
+
+train_data$health__air_pollution_particulate_matter[ap_NA] <- ap_med
+```
+
+The initial spread of values showed a large discrepancy in population size, especially in the min and max regions so values were grouped into a smaller number of populations that were closer in size (B)
+
+```{r}
 #Histogram for air pollution regrouped
 cut_labels <- c("<= 10", "11", "12", "13", "14+")
 cut_levels <- c(0, 10.9, 11.9, 12.9, 13.9, 100)
@@ -429,9 +438,9 @@ cut_levels <- c(0, 10.9, 11.9, 12.9, 13.9, 100)
 train_data$air_pollution <- cut(train_data$health__air_pollution_particulate_matter, cut_levels)
 levels(train_data$air_pollution) <- cut_labels
 
-train_data %>% subset(!is.na(air_pollution)) %>%
+train_data %>% 
   ggplot(aes(x=air_pollution))+
-  geom_bar() + xlab("air pollution (mcg/m3)")+
+  geom_bar() + xlab("air pollution (µg/m^3)")+
   theme(axis.text.x = element_text(size=20))+
   ggtitle("(B)")+theme(plot.title = element_text(hjust=0.5))
 ```
@@ -440,37 +449,109 @@ Using the new groups, histograms and boxplots show the spreads to be approximate
 
 ```{r}
 #Histograms by air pollution
-plot <- ggplot(subset(train_data, !is.na(air_pollution)),
-               aes(x=heart_disease_mortality_per_100k))+xlab("heart_mort_100k")+
-  geom_histogram(binwidth = (high_mort-low_mort)/40)
-plot <- plot+facet_wrap(~ air_pollution, drop=TRUE, ncol = 3)
-plot <- plot+geom_vline(linetype="dashed", xintercept = hd_mean, color = "blue")
-plot <- plot+geom_vline(linetype="dashed", xintercept = hd_med, color = "red")
-plot <- plot + annotate("text", x=hd_mean+40, y=80, label="<- mean", size=2.5, color = "blue")
-plot <- plot + annotate("text", x=hd_med-40, y=80, label="median ->", size=2.5, color = "red")
-plot
+train_data %>% ggplot(aes(x=heart_disease_mortality_per_100k))+
+  xlab("heart_mort_100k")+
+  geom_histogram(binwidth = (high_mort-low_mort)/40)+
+  facet_wrap(~ air_pollution, drop=TRUE, ncol = 3)+
+  geom_vline(linetype="dashed", xintercept = hd_mean, color = "blue")+
+  geom_vline(linetype="dashed", xintercept = hd_med, color = "red")+
+  annotate("text", x=hd_mean+40, y=80, label="<- mean", size=2.5, color = "blue")+
+  annotate("text", x=hd_med-40, y=80, label="median ->", size=2.5, color = "red")
 
 #Box plot by air_pollution
-plot <- ggplot(subset(train_data, !is.na(air_pollution)),
-               aes(x=air_pollution, y=heart_disease_mortality_per_100k))+xlab("")+
-  geom_boxplot()+ geom_hline(linetype="dashed", yintercept = hd_mean, color = "blue")
-plot <- plot+geom_hline(linetype="dashed", yintercept = hd_med, color = "red")
-plot <- plot + theme(axis.text.x = element_text(angle = 45, hjust=1, vjust=1)) + ggtitle("Air Pollution (mcg/m^3)")+theme(plot.title = element_text(hjust=0.5))
-plot <- plot + annotate("text", x=.5, y=hd_mean+30, label="mean", size=3, color = "blue", angle=90)
-plot <- plot + annotate("text", x=5.5, y=hd_med-30, label="median", size=3, color = "red", angle=90)
-plot
+train_data %>% ggplot(aes(x=air_pollution, y=heart_disease_mortality_per_100k))+
+  xlab("")+
+  geom_boxplot()+
+  geom_hline(linetype="dashed", yintercept = hd_mean, color = "blue")+
+  geom_hline(linetype="dashed", yintercept = hd_med, color = "red")+
+  theme(axis.text.x = element_text(angle = 45, hjust=1, vjust=1))+
+  ggtitle("Air Pollution (µg/m^3)")+theme(plot.title = element_text(hjust=0.5))+
+  annotate("text", x=.5, y=hd_mean+30, label="mean", size=3, color = "blue", angle=90)+
+  annotate("text", x=5.5, y=hd_med-30, label="median", size=3, color = "red", angle=90)
 ```
 
 A statistical summary of the air pollution groups confirms the interpretation of the histogram and box plots, and makes this feature a suitable candidate for a predictive model.
 
---do stuff with knitr or gridextra--
+```{r, warning=FALSE}
+bind_rows(train_data %>% select(heart_disease_mortality_per_100k,
+                      air_pollution) %>%
+  group_by(air_pollution) %>%
+  summarize(mn = mean(heart_disease_mortality_per_100k),
+            md = median(heart_disease_mortality_per_100k)) %>%
+  mutate(MeanAboveBelow = ifelse(round(mn,1) < hd_mean, 
+                                 "Below",
+                                 ifelse(round(mn,1) == hd_mean,
+                                        "Equal", "Above")),
+         MedianAboveBelow = ifelse(round(md,1) < hd_med,
+                                   "Below",
+                                   ifelse(round(md,1) == hd_med,
+                                          "Equal", "Above"))) %>%
+  select(air_pollution, mn, MeanAboveBelow, md, MedianAboveBelow)
+  , data.frame(air_pollution = "Total Population Values", 
+               mn= hd_mean, 
+               MeanAboveBelow = "_",
+               md = hd_med,
+               MedianAboveBelow = "_")
+)
+```
 
 #### Correlation Between Numeric Features and Heart Disease Mortality
-(note: all correlation calculations in this analysis are performed after data records with missing values for the feature in questions are removed)
+##### Handling NAs
+There are 3 features that have not yet been handled that all have an NA percentage between 1% and 10%
+
+```{r}
+#Which features have a NA % between 1 and 10
+na_mid <- NAs[NAs$NA_pct > 1 & NAs$NA_pct < 10, ]
+na_mid %>% arrange(desc(NA_pct))
+```
+
+We examine the distributions of these continuous features, showing the mean and median, to determine how best to handle the NAs
+
+```{r, warning=FALSE}
+#Calculate the mean and median of the features in question
+feat_means <- train_data %>% select(as.vector(na_mid[,1])) %>%
+  gather(feature, value) %>% group_by(feature) %>%
+  mutate(mn = mean(value, na.rm=TRUE), md = median(value, na.rm=TRUE))
+
+#Plot histogram, faceted by feature, overlaying the mean and median values of each
+train_data %>% select(as.vector(na_mid[,1])) %>%
+  gather(feature, value) %>%
+  ggplot(aes(x=value))+geom_histogram(bins=40)+
+  geom_vline(aes(xintercept=mn), data = feat_means, linetype = "dashed", color = "yellow")+
+  geom_vline(aes(xintercept=md), data = feat_means, linetype = "dashed", color = "red")+
+  theme(axis.text.x = element_text(angle = 45, hjust=1, vjust=1))+
+  facet_wrap(~ feature, scales="free") +
+  xlab("yellow = mean; red = median") + ylim(0, 1000)
+
+
+```
+
+All 3 features appear approximately normal with a positive skew. The mean and median are different enough that, combined with the skewness, we should be able to replace the NAs with the median value and not introduce too much bias.
+
+```{r}
+#Replace the NAs with the median for each feature
+mid_cols <- as.vector(na_mid[, 1])
+
+train_data <- train_data %>%
+  mutate_at(mid_cols, ~ifelse(is.na(.x), median(.x, na.rm = TRUE), .x))
+
+#Re-plot the distros
+train_data %>% select(as.vector(na_mid[,1])) %>%
+  gather(feature, value) %>%
+  ggplot(aes(x=value))+geom_histogram(bins=40)+
+  geom_vline(aes(xintercept=mn), data = feat_means, linetype = "dashed", color = "yellow")+
+  geom_vline(aes(xintercept=md), data = feat_means, linetype = "dashed", color = "red")+
+  theme(axis.text.x = element_text(angle = 45, hjust=1, vjust=1))+
+  facet_wrap(~ feature, scales="free") +
+  xlab("yellow = mean; red = median") + ylim(0, 1000)
+
+```
+
 
 ##### Economic Factors
 The remaining economic factors in the dataset (after already looking at typology) are numeric, so a correlation analysis is done to determine if any of these are candidates for use in a predictive model.
-*	% Civilian Labor
+
+* % Civilian Labor
 *	% Unemployment
 *	% Uninsured Adults
 *	% Uninsured Children
@@ -550,25 +631,24 @@ for (i in 1:length(cname)) {
 do.call(grid.arrange, p)
 ```
 
-As seen above, “Percent of Civilian Labor” shows a moderate negative correlation with heart disease mortality (despite the number of outliers appearing to be greater than the other factors) and is a good candidate for use in a predictive model.  The remaining factors do not show a strong enough correlation ( >= 0.45) to be considered good candidates.
+As seen above, **“Percent of Civilian Labor”** shows a moderate negative correlation with heart disease mortality (despite the number of outliers appearing to be greater than the other factors) and is a good candidate for use in a predictive model.  The remaining factors do not show a strong enough correlation ( >= 0.45) to be considered good candidates.
 
 ##### Demographics
-The dataset contains 12 demographic features that are reported as percentages of the population. A correlation analysis of those features in a similar manner to the economic factors. (NOTE: there are 2 numeric features that are represented as rates per 1000 people, and act more like categorical features as they are distinct whole numbers; a cursory exploration of these two factors was performed, but nothing of interest resulted from the exploration)
+The dataset contains 12 demographic features that are reported as percentages of the population and 2 that are given in rates per 1000 people. A correlation analysis of those features is done in a similar manner to the economic factors.
 
 ```{r}
-cols <- colnames(train_data)[like(colnames(train_data), "demo__pct")] 
+cols <- colnames(train_data)[like(colnames(train_data), "demo__")] 
 ncol <- ifelse(length(cols) <= 6, 2, 3)
 
 train_data %>% select(heart_disease_mortality_per_100k, cols) %>%
   gather(data_type, val, -heart_disease_mortality_per_100k) %>%
-  mutate(data_type = substr(data_type, 11, 100)) %>%
-  mutate(val = val * 100) %>%
+  mutate(data_type = substr(data_type, 7, 100)) %>%
   ggplot(aes(x=val, y= heart_disease_mortality_per_100k))+geom_point(na.rm = TRUE)+
-  facet_wrap(~ data_type, ncol=ncol, scales="fixed")+xlab("percent")+
-  geom_smooth(method="lm", na.rm = TRUE)
+  facet_wrap(~ data_type, ncol=ncol, scales="free_x")+xlab("percent/rate per 1k")+
+  geom_smooth(method="lm")
 
 data.frame(
-  feature=names(train_data[cols]),
+  feature=substr(names(train_data[cols]), 7, 100),
   corr = sapply(train_data[cols], function(x) {
     cor(data.frame(train_data$heart_disease_mortality_per_100k, x),
         use="complete.obs")[1,2] })
@@ -630,20 +710,20 @@ for (i in 1:length(cname)) {
 do.call(grid.arrange, p)
 ```
 
-Analysis of the correlation scatter plots showed that there were several candidates for model features. “Percent of non-Hispanic African Americans” was chosen as it had the strongest correlation in the subset of race/ethnicity demographics, even though its actual correlation was only moderate ( < .45 ).  “Adults with less than a High School diploma” and “Adults with a Bachelor’s Degree or higher” were chosen for their strong positive and negative correlations, respectively.
+Analysis of the correlation scatter plots showed that there were several candidates for model features. **“Percent of non-Hispanic African Americans”** was chosen as it had the strongest correlation in the subset of race/ethnicity demographics, even though its actual correlation was only moderate ( < .45 ).  **“Adults with less than a High School diploma”** and **“Adults with a Bachelor’s Degree or higher”** were chosen for their strong positive and negative correlations, respectively.  **"Death Rate per 1000"** also showed a high-moderate correlation.
 
 The other two demographic categories related to education level (“High School Diploma”, “Some College”) were considered as features, but in practice they added no predictive power to the model. Two combination features, one of which added together “High School” and “Less than High School” and the other “Some College” and “Bachelor’s or higher” were considered as well.  While the combination features had higher correlations with heart disease mortality than the individual features, in practice the model seemed to suffer from overfitting when the combination features were used in place of the individual ones.
 
 Because of their extremely weak correlations (abs value < .15), demographic features related to gender and age were not considered for the model.
 
 #### Health Statistics
-There are 10 more health-related factors present in the dataset (after air pollution). All are numerical, 6 are presented as percentage of the population, two are rates per 100,000 people, and two are rates related to the number of people per medical professional (primary care doctor, dentist).  The 2 features related to medical professional did not show a strong correlation ( > 0.45) to heart disease mortality rate, so they were not considered for the predictive model.
+There are 6 remaining health-related factors present in the dataset (after air pollution and the high NA features were removed). All are numerical, 4 are presented as percentage of the population, and 2 are rates related to the number of people per medical professional (primary care doctor, dentist).  
 
-##### Health Percentages
-A scatter plot and correlation analysis was done for the 6 numerical features presented as population percentages:
+A scatter plot and correlation analysis was done for the 6 remaining numerical health-related features:
 
 ```{r}
-cols <- colnames(train_data)[like(colnames(train_data), "health__pct")] 
+cols <- colnames(train_data)[like(colnames(train_data), "health__")] 
+cols <- cols[!like(cols, "health__air")]
 ncol <- ifelse(length(cols) <= 6, 2, 3)
 
 train_data %>% select(heart_disease_mortality_per_100k, cols) %>%
@@ -651,7 +731,7 @@ train_data %>% select(heart_disease_mortality_per_100k, cols) %>%
   mutate(data_type = substr(data_type, 9, 100)) %>%
   mutate(val = val * 100) %>%
   ggplot(aes(x=val, y= heart_disease_mortality_per_100k))+geom_point(na.rm = TRUE)+
-  facet_wrap(~ data_type, ncol=ncol, scales="fixed")+xlab("percent")+
+  facet_wrap(~ data_type, ncol=ncol, scales="free_x")+xlab("percent/per provider")+
   geom_smooth(method="lm", na.rm = TRUE)
 
 data.frame(
@@ -717,35 +797,38 @@ for (i in 1:length(cname)) {
 do.call(grid.arrange, p)
 ```
 
-Percent of Physical Inactivity shows the strongest correlation with heart disease mortality among the health percentages, indicating a strong candidate for the predictive model. Three other percentages (Obesity, Smoking, Diabetes) also showed strong correlation with heart disease mortality, but some further thought and analysis produced features with even stronger correlations.
+The 2 features related to medical professionals did not show a strong correlation ( > 0.45) to heart disease mortality rate, so they were not considered for the predictive model.
+
+"Percent of Physical Inactivity" shows the strongest correlation with heart disease mortality among the health percentages, indicating a strong candidate for the predictive model. Two other percentages (Obesity, Diabetes) also showed strong correlation with heart disease mortality, but some further thought and analysis produced features with even stronger correlations.
 
 ##### Combining Health Percentages
 Thinking about the 3 health percentages:
 * Percent of adult obesity
-* Percent of adult smoking
+* Percent of physical inactivity
 * Percent of diabetes
-we can say that each of the percentages is the same as the probability of a randomly chosen individual in that county having the specific condition. Let us further assume that each of the events (being obese, smoking, having diabetes) are independent of each other. According to probability theory, the probability of two independent events occurring is simply the product of the two individual probabilities. Therefore
+we can say that each of the percentages is the same as the probability of a randomly chosen individual in that county having the specific condition. Let us further assume that each of the events (being obese, being physically inactive, having diabetes) are independent of each other. According to probability theory, the probability of two independent events occurring is simply the product of the two individual probabilities. Therefore
 
 $$P(diabetes & obese) = P(diabetes) * P(obese)$$
 
-$$P(diabetes & smoking) = P(diabetes) * P(smoking)$$
+$$P(diabetes & physical inactivity) = P(diabetes) * P(physical_inactivity)$$
 
-$$P(obese & smoking) = P (obese) * P(smoking)$$
+$$P(obese & phyiscal inactivity) = P (obese) * P(physical_inactivity)$$
 
-$$P(obese & smoking & diabetes) = P(obese) * P(smoking) * P(diabetes)$$
+$$P(obese & diabetes & physical inactivity) = P(obese) * P(diabetes) * P(phyiscal inactivity)$$
 
 By calculating these combined probabilities, we find features that have even stronger correlation that each individual feature
 ```{r}
 train_data <- train_data %>% 
   mutate(p_diab_obese = health__pct_adult_obesity * health__pct_diabetes) %>%
-  mutate(p_diab_smoke = health__pct_diabetes * health__pct_adult_smoking) %>%
-  mutate(p_obese_smoke = health__pct_adult_smoking * health__pct_adult_obesity) %>%
-  mutate(p_all_three = health__pct_adult_obesity * health__pct_adult_obesity * health__pct_adult_smoking )
+  mutate(p_obese_inact = health__pct_adult_obesity * health__pct_physical_inactivity) %>%
+  mutate(p_diab_inact = health__pct_diabetes * health__pct_physical_inactivity) %>%
+  mutate(p_all_three = health__pct_adult_obesity * health__pct_diabetes * health__pct_physical_inactivity )
+
 ```
 ```{r}
 cols <- c("p_diab_obese", 
-          "p_diab_smoke", 
-          "p_obese_smoke", 
+          "p_obese_inact", 
+          "p_diab_inact", 
           "p_all_three")
 
 ncol <- ifelse(length(cols) <= 6, 2, 3)
@@ -767,7 +850,7 @@ data.frame(
   ) %>% arrange(desc(abs(corr)))
 
 ```
-```{r, echo=FALSE}
+```{r, echo=FALSE, eval=FALSE}
 corr <- data.frame()
 for (i in 1:length(cols)) {
   corr[cols[i],1] <- round(cor(data.frame(train_data$heart_disease_mortality_per_100k,
@@ -782,53 +865,9 @@ corr <- corr %>% mutate(type = substr(type, 3, 100)) %>% arrange(desc(abs(cor)))
 corr %>% grid.table()
 ```
 
-The 3 combinations with the strongest correlations ( > 0.64) are good candidates for the predictive model (Diab+Obese, Diab+Smoke, All Three). In practice, Obese+Smoke did not add any predictive power to the model, so it was omitted.
+All of the combinations had a correlation higher than any one individual feature, so we will use these combined probabilities in the predictive model.
 
-####Death Rates
-Homicide rate and Motor Vehicle Death rate (both per 100,000 individuals) each showed moderate correlation with heart disease mortality (0.441 and 0.460, respectively). However, when each factor was converted to a log10 scale, the correlation got stronger (.501, .504, respectively).
-
-```{r, warning=FALSE}
-train_data$log_homicide_per_100k <-
-  ifelse(train_data$health__homicides_per_100k <= 0, NA,
-         log10(train_data$health__homicides_per_100k))
-train_data$log_motor_vehicle_death_per_100k <-
-  log10(train_data$health__motor_vehicle_crash_deaths_per_100k)
-
-train_data <- train_data %>%
-  mutate(death_rate_motor_vehicle_crash_per_100k = health__motor_vehicle_crash_deaths_per_100k,
-         death_rate_homicides_per_100k = health__homicides_per_100k)
-
-cols <- c("death_rate_homicides_per_100k", 
-          "death_rate_motor_vehicle_crash_per_100k",
-          "log_homicide_per_100k",
-          "log_motor_vehicle_death_per_100k")
-
-ncol <- 2
-
-train_data %>% select(heart_disease_mortality_per_100k, cols) %>%
-  gather(data_type, val, -heart_disease_mortality_per_100k) %>%
-  ggplot(aes(x=val, y= heart_disease_mortality_per_100k))+geom_point(na.rm = TRUE)+
-  facet_wrap(~ data_type, ncol=ncol, scales="free_x")+xlab("per_100k")+
-  geom_smooth(method="lm", na.rm = TRUE)
-```
-```{r, echo=FALSE}
-corr <- data.frame()
-for (i in 1:length(cols)) {
-  corr[cols[i],1] <- round(cor(data.frame(train_data$heart_disease_mortality_per_100k,
-                              train_data[,cols[i]]),
-                   use="complete.obs")[1,2],3)
-}
-
-corr <- cbind(cols, corr)
-colnames(corr) <- c("type", "cor")
-corr <- corr %>% arrange(desc(abs(cor)))
-
-corr %>% grid.table()
-```
-
-Each version was used in separate iterations of the predictive model, and surprisingly, the “base” version (prior to log10 conversion) showed marginally better predictive power.
-
-##Data Preparation for Predictive Modelling
+##Predictive Modelling
 The features chosen for use in the predictive model are
 
 * Economic Typology (categorical)
@@ -837,111 +876,55 @@ The features chosen for use in the predictive model are
 * Air Pollution concentration (categorical)
 * Percent of Civilian Labor (numeric)
 * Percent non-Hispanic African American (numeric)
-* Percent of Adult Physical Inactivity (numeric)
+* Death Rate per 1,000 (numeric)
 * Percent of adults with less than a High School diploma (numeric)
 * Percent of adults with Bachelor’s Degree or higher (numeric)
+* Percent of Adult Physical Inactivity (numeric)
 * Percent of adults that are obese and have diabetes (numeric)
-* Percent of adults that smoke and have diabetes (numeric)
-* Percent of adults that are obese, smoke, and have diabetes (numeric)
-* Homicides per 100,000 individuals (numeric)
-* Motor vehicle crash deaths per 100,000 individuals (numeric)
-
-In order to take advantage of predictive models in R, missing values need to be handled. The two choices would be to either remove rows with missing data, or to replace missing values with a constant value based on the characteristics of the feature.
-
-###Numeric data
-First we look at the number of records in the entire data set that are missing at least one of the chosen predictors
+* Percent of adults that are obese and are physically inactive (numeric)
+* Percent of adults that have diabetes and are physically inactive (numeric)
+* Percent of adults that are obese, have diabetes and are physically inactive (numeric)
 
 ```{r}
 model_cols <- c("econ__economic_typology",
-                "population", 
+                "population",
                 "metro",
                 "air_pollution",
                 "econ__pct_civilian_labor",
                 "demo__pct_non_hispanic_african_american",
+                "demo__death_rate_per_1k",
                 "demo__pct_adults_bachelors_or_higher",
                 "demo__pct_adults_less_than_a_high_school_diploma",
+                "health__pct_physical_inactivity",
                 "p_diab_obese",
-                "p_diab_smoke",
-                "p_all_three",
-                "health__homicides_per_100k",
-                "health__motor_vehicle_crash_deaths_per_100k")
+                "p_obese_inact",
+                "p_diab_inact",
+                "p_all_three")
 
-cont_cols <- model_cols[-c(1:4)]
-
-#How many rows have at least 1 missing numeric value?
-mval <- function(x) {
-  this_row <- train_data %>% filter(row_id==x) %>% 
-    select(row_id, cont_cols) %>% as.vector()
-  ifelse(length(which(is.na(this_row)))>0, this_row[1], 0)
-}
-
-missval <- sapply(train_data$row_id, mval, simplify = TRUE)
-
-mean(missval!=0)  ##Percentage of rows with missing values
-
+train_data <- train_data %>% select(model_cols, heart_disease_mortality_per_100k)
 ```
 
-We see that well over 50% of the records have at least one numeric feature missing. This means that eliminating the records with missing data is not feasible. So the next step is to determine if a small number of predictors is contributing the majority of the missing values, in which case we can remove the predictor.
+Since the outcome of the model (Heart Disease Mortality per 100,000 people) needs to be a number (as opposed to a class or category), we will need to use some kind of regression model to get the outcome we desire.
+
+###Normalization of Numeric Features
+For a regression model, if we have features that are different by orders of magnitude we likely need to do something so that larger values do not dominate the formula. Since most of the numeric features are percentages (i.e. 0 < x < 1), we will apply a transformation to at least the "Death Rate per 1,000" feature.
+
+####Exploration of feature distributions
+
+We plot histograms of each of the continuous features to get more information about each feature
 
 ```{r}
-#Which features have most NAs
-data.frame(
-  NA_pct = sapply(train_data[cont_cols],
-                  function(x){mean(ifelse(is.na(x), 1, 0))},
-                  simplify=TRUE))
-```
+#Find all numeric columns left in the data set
+num_cols <- train_data %>% 
+  select(-heart_disease_mortality_per_100k) %>%
+  .[sapply(., is.numeric)] %>% 
+  colnames()
 
-
-which value, per feature, makes the most sense as a substitute. Using the MEAN value of the feature makes sense if the data is relatively normal, while MEDIAN would work best for highly skewed data.  We produce histograms showing the distribution, mean and median for the numeric features to examine the normalcy:
-
-```{r, warning=FALSE}
-feat_means <- train_data %>% select(cont_cols) %>%
-  gather(feature, value) %>% group_by(feature) %>%
-  mutate(mn = mean(value, na.rm=TRUE), 
-         md = median(value, na.rm=TRUE))
-
-train_data %>% select(cont_cols) %>%
+#Plot histograms
+train_data %>% select(num_cols) %>%
   gather(feature, value) %>%
-  ggplot(aes(x=value)) + geom_histogram() +
-  geom_vline(aes(xintercept=mn), 
-             data = feat_means, linetype = "dashed", 
-             color = "green")+
-  geom_vline(aes(xintercept=md), 
-             data = feat_means, linetype = "dashed", 
-             color = "red")+
-  facet_wrap(~ feature, scales="free") +
-  xlab("green = mean; red = median")
+  ggplot(aes(x=value)) + geom_histogram(bins=50) +
+  facet_wrap(~ feature, scales="free")
 ```
 
-For all features except for Percent of Civilian Labor, the data is skewed positive, and the median is not insignificantly different (lower) than the mean. So replacing NA values with the MEDIAN of the population would introduce the least bias to the data.
-
-```{r}
-#Replace NA with column median
-train_data <- train_data %>%
-  mutate_at(cont_cols, 
-            ~ifelse(is.na(.x), median(.x, na.rm = TRUE), .x))
-
-```
-
-###Categorical
-The number of records with NA in the categorical features is much different
-
-```{r}
-mval <- function(x) {
-  this_row <- train_data %>% filter(row_id==x) %>% 
-    select(row_id, model_cols[1:4]) %>% as.vector()
-  ifelse(length(which(is.na(this_row)))>0, this_row[1], 0)
-}
-
-missval_c <- sapply(train_data$row_id, mval, simplify = TRUE)
-
-length(which(missval_c!=0))
-```
-
-As less than 1% of records in the data set have NA in a chosen categorical feature, the best approach is to remove those records from the data set.
-
-```{r}
-train_data <- train_data[which(missval_c==0),]
-```
-
-
+The continuous features show an approximate normal distribution (although some are skewed), with the exception of "Percent non-Hispanic African American" and "Percent of adults with less than a High School diploma".

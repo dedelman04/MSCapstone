@@ -1,7 +1,7 @@
 #Build categorical mean/median tables
 bind_rows(train_data %>% select(heart_disease_mortality_per_100k,
-                      population) %>%
-  group_by(population) %>%
+                      air_pollution) %>%
+  group_by(air_pollution) %>%
   summarize(mn = mean(heart_disease_mortality_per_100k),
             md = median(heart_disease_mortality_per_100k)) %>%
   mutate(MeanAboveBelow = ifelse(round(mn,1) < hd_mean, 
@@ -12,25 +12,25 @@ bind_rows(train_data %>% select(heart_disease_mortality_per_100k,
                                    "Below",
                                    ifelse(round(md,1) == hd_med,
                                           "Equal", "Above"))) %>%
-  select(population, mn, MeanAboveBelow, md, MedianAboveBelow)
-  , data.frame(population = "Population", 
+  select(air_pollution, mn, MeanAboveBelow, md, MedianAboveBelow)
+  , data.frame(air_pollution = "Population", 
                mn= hd_mean, 
                MeanAboveBelow = "",
                md = hd_med,
                MedianAboveBelow = "")
 )
 
-cols <- colnames(train_data)[like(colnames(train_data), "demo__pct")]
-cols <- cols[!like(cols, "health_")]
+cols <- colnames(train_data)[like(colnames(train_data), "health__")]
+cols <- cols[!like(cols, "health__air")]
 ncol <- ifelse(length(cols) <= 6, 2, 3)
 
 train_data %>% select(heart_disease_mortality_per_100k, cols) %>%
   gather(data_type, val, -heart_disease_mortality_per_100k) %>%
-  mutate(data_type = substr(data_type, 3, 100)) %>%
-  mutate(val = val*100) %>%
+  mutate(data_type = substr(data_type, 9, 100)) %>%
+#  mutate(val = val*100) %>%
   ggplot(aes(x=val, y= heart_disease_mortality_per_100k))+geom_point(na.rm = TRUE)+
-  facet_wrap(~ data_type, ncol=ncol, scales="fixed")+
-  geom_smooth(method="lm", na.rm = TRUE)+xlab("percent")
+  facet_wrap(~ data_type, ncol=ncol, scales="free_x")+
+  geom_smooth(method="lm")+xlab("percent")
 #  scale_x_continuous(labels=scales::percent)
 
 #Continuous columns
@@ -52,6 +52,13 @@ data.frame(feature=num_cols,
            corr = sapply(train_data[num_cols], get_corr)) %>% 
   arrange(desc(abs(corr)))
 
+data.frame(
+  feature=names(train_data[cols]),
+  corr = sapply(train_data[cols], function(x) {
+    cor(data.frame(train_data$heart_disease_mortality_per_100k, x),
+        use="complete.obs")[1,2] })
+) %>% arrange(desc(abs(corr)))
+
 #Plot all numerics faceted by categorical variable and colored by cat value
 #To look for possible clusters
 multi_plot <- function(x) {
@@ -69,6 +76,39 @@ tmp <- lapply(names(train_data[num_cols]),
            facet_wrap(~ category) + geom_point(aes(color=value)) +xlab(x)
          
        })
+
+#Look for correlation between diabetes, obesity, physical inactivity
+cols <- c("health__pct_physical_inactivity",
+          "health__pct_diabetes",
+          "health__pct_adult_obesity")
+
+train_data <- train_data %>% 
+  mutate(p_diab_obese = health__pct_adult_obesity * health__pct_diabetes) %>%
+  mutate(p_obese_inact = health__pct_adult_obesity * health__pct_physical_inactivity) %>%
+  mutate(p_diab_inact = health__pct_diabetes * health__pct_physical_inactivity) %>%
+  mutate(p_all_three = health__pct_adult_obesity * health__pct_diabetes * health__pct_physical_inactivity )
+
+cols <- c("p_diab_obese", 
+          "p_obese_inact", 
+          "p_diab_inact", 
+          "p_all_three")
+
+ncol <- ifelse(length(cols) <= 6, 2, 3)
+
+train_data %>% select(heart_disease_mortality_per_100k, cols) %>%
+  gather(data_type, val, -heart_disease_mortality_per_100k) %>%
+  mutate(data_type = substr(data_type, 3, 100)) %>%
+  mutate(val = val * 100) %>%
+  ggplot(aes(x=val, y= heart_disease_mortality_per_100k))+geom_point(na.rm = TRUE)+
+  facet_wrap(~ data_type, ncol=ncol, scales="fixed")+xlab("percent")+
+  geom_smooth(method="lm", na.rm = TRUE)
+
+data.frame(
+  feature=names(train_data[cols]),
+  corr = sapply(train_data[cols], function(x) {
+    cor(data.frame(train_data$heart_disease_mortality_per_100k, x),
+        use="complete.obs")[1,2] })
+) %>% arrange(desc(abs(corr)))
 
 
 #Cross each numeric feature with each categorical feature and get correlation
@@ -126,16 +166,16 @@ model_cols <- c("econ__economic_typology",
                 "air_pollution",
                 "econ__pct_civilian_labor",
                 "demo__pct_non_hispanic_african_american",
+                "demo__death_rate_per_1k",
                 "demo__pct_adults_bachelors_or_higher",
                 "demo__pct_adults_less_than_a_high_school_diploma",
+                "health__pct_physical_inactivity",
                 "p_diab_obese",
-                "p_diab_smoke",
-                "p_all_three",
-                "health__homicides_per_100k",
-                "health__motor_vehicle_crash_deaths_per_100k",
-                "health__pct_adult_obesity",
-                "health__pct_diabetes",
-                "health__pct_adult_smoking")
+                "p_obese_inact",
+                "p_diab_inact",
+                "p_all_three")
+
+train_data <- train_data %>% select(model_cols, heart_disease_mortality_per_100k)
 
 cont_cols <- model_cols[-c(1:4)]
 
@@ -179,24 +219,94 @@ NAs %>% arrange(desc(NA_pct))
 
 high_NA <- NAs %>% filter(NA_pct > 10) %>% .$features %>% as.character()
 
-head(train_data %>% select(-high_NA))
+train_data <- train_data %>% select(-high_NA)
 
 na2 <- as.vector(NAs$features[NAs$NA_pct == 0.0625])
-str(train_data %>% select(as.vector(NAs$features[NAs$NA_pct == 0.0625]))) %>%
+
+na_mid <- NAs[NAs$NA_pct > 1 & NAs$NA_pct < 10, ]
+
+#Calculate the mean and median of the features in question
+feat_means <- train_data %>% select(as.vector(na_mid[,1])) %>%
+  gather(feature, value) %>% group_by(feature) %>%
+  mutate(mn = mean(value, na.rm=TRUE), md = median(value, na.rm=TRUE))
+
+#Plot historgram, faceted by feature, overlaying the mean and median values of each
+train_data %>% select(as.vector(na_mid[,1])) %>%
+  gather(feature, value) %>%
+  ggplot(aes(x=value))+geom_histogram(bins=40)+
+  geom_vline(aes(xintercept=mn), data = feat_means, linetype = "dashed", color = "yellow")+
+  geom_vline(aes(xintercept=md), data = feat_means, linetype = "dashed", color = "red")+
+  theme(axis.text.x = element_text(angle = 45, hjust=1, vjust=1))+
+  facet_wrap(~ feature, scales="free") +
+  xlab("yellow = mean; red = median") + ylim(0,1000)
+
+sapply(train_data %>% select(as.vector(na_mid[, 1])),
+       function(x) {
+         feat_med <- median(x, na.rm=TRUE)
+         feat_NA <- which(is.na(x))
+         x[feat_NA] <- feat_med
+       }
+)
+mid_cols <- as.vector(na_mid[, 1])
+train_data <- train_data %>%
+  mutate_at(mid_cols, ~ifelse(is.na(.x), median(.x, na.rm = TRUE), .x))
 
 min_missing <- min(NAs %>% filter(NA_pct > 0) %>% select(NA_pct))  
 NA2 <- sapply(train_data %>% 
          select(as.vector(NAs$features[NAs$NA_pct == min_missing])),
        function(x){which(is.na(x))}, simplify=TRUE)
 
+train_data <- train_data[-t(NA2)[1,c(1:2)], ]
+
 train_data[t(NA2)[1,c(1:2)], ]
 
 
+#Histogram for air pollution original
+train_data %>% filter(!is.na(health__air_pollution_particulate_matter)) %>%
+  ggplot(aes(x=health__air_pollution_particulate_matter))+
+  geom_histogram(binwidth=1) + xlab("air pollution (µg/m^3)")+
+  theme(axis.text.x = element_text(size=20))+
+  ggtitle("(A)")+theme(plot.title = element_text(hjust=0.5))
+
+#Histogram for air pollution regrouped
+cut_labels <- c("<= 10", "11", "12", "13", "14+")
+cut_levels <- c(0, 10.9, 11.9, 12.9, 13.9, 100)
+
+train_data$air_pollution <- cut(train_data$health__air_pollution_particulate_matter, cut_levels)
+levels(train_data$air_pollution) <- cut_labels
+
+train_data %>% 
+  ggplot(aes(x=air_pollution))+
+  geom_bar() + xlab("air pollution (µg/m^3)")+
+  theme(axis.text.x = element_text(size=20))+
+  ggtitle("(B)")+theme(plot.title = element_text(hjust=0.5))
+
+ap_med <- median(train_data$health__air_pollution_particulate_matter, na.rm=TRUE)
+ap_NA <- which(is.na(train_data$health__air_pollution_particulate_matter))
+
+train_data$health__air_pollution_particulate_matter[ap_NA] <- ap_med
+
 #plot distros of numeric data
-train_data %>% select(cont_cols) %>%
+num_cols <- train_data %>% 
+  select(-heart_disease_mortality_per_100k) %>%
+  .[sapply(., is.numeric)] %>% 
+  colnames()
+
+train_data %>% select(num_cols) %>%
   gather(feature, value) %>%
   ggplot(aes(y=value)) + geom_boxplot() + 
   facet_wrap(~ feature, scales="free_y")
+
+feat_means <- train_data %>% select(num_cols) %>%
+  gather(feature, value) %>% group_by(feature) %>%
+  mutate(mn = mean(value, na.rm=TRUE), md = median(value, na.rm=TRUE))
+
+train_data %>% select(num_cols) %>%
+  gather(feature, value) %>%
+  ggplot(aes(x=value)) + geom_histogram(bins=50) +
+  facet_wrap(~ feature, scales="free")
+
+
 
 feat_means <- train_data %>% select(cont_cols) %>%
   gather(feature, value) %>% group_by(feature) %>%
@@ -276,3 +386,27 @@ lm_fit$results
 
 glm_fit <- train(x, y, method="glm")
 glm_fit$results
+
+
+
+
+#Histograms by air pollution
+train_data %>% ggplot(aes(x=heart_disease_mortality_per_100k))+
+  xlab("heart_mort_100k")+
+  geom_histogram(binwidth = (high_mort-low_mort)/40)+
+  facet_wrap(~ air_pollution, drop=TRUE, ncol = 3)+
+  geom_vline(linetype="dashed", xintercept = hd_mean, color = "blue")+
+  geom_vline(linetype="dashed", xintercept = hd_med, color = "red")+
+  annotate("text", x=hd_mean+40, y=80, label="<- mean", size=2.5, color = "blue")+
+  annotate("text", x=hd_med-40, y=80, label="median ->", size=2.5, color = "red")
+
+#Box plot by air_pollution
+train_data %>% ggplot(aes(x=air_pollution, y=heart_disease_mortality_per_100k))+
+  xlab("")+
+  geom_boxplot()+
+  geom_hline(linetype="dashed", yintercept = hd_mean, color = "blue")+
+  geom_hline(linetype="dashed", yintercept = hd_med, color = "red")+
+  theme(axis.text.x = element_text(angle = 45, hjust=1, vjust=1))+
+  ggtitle("Air Pollution (mcg/m^3)")+theme(plot.title = element_text(hjust=0.5))+
+  annotate("text", x=.5, y=hd_mean+30, label="mean", size=3, color = "blue", angle=90)+
+  annotate("text", x=5.5, y=hd_med-30, label="median", size=3, color = "red", angle=90)
