@@ -352,61 +352,6 @@ bind_rows(train_data %>% select(heart_disease_mortality_per_100k,
 
 With population groups showing a different distribution for heart mortality rates, this calculated feature is another good candidate for use in a predictive model.
 
-The analysis went one step further and grouped the RUCC values based on whether or not the county was considered to be a metropolitan area or not.  Based solely on the first word in the RUCC category title, each county was classified as either “Metro” or “Non-Metro”.
-
-```{r}
-#Group into metro/non-metro
-train_data <- train_data %>% 
-  mutate(metro = ifelse(like(area__rucc, "Nonmetro"), 
-                        "Nonmetro", "Metro"))
-
-#Histograms by metro type
-train_data %>% ggplot(aes(x=heart_disease_mortality_per_100k))+
-  xlab("heart_mort_100k")+
-  geom_histogram(binwidth = (high_mort-low_mort)/40)+
-  facet_wrap(~ metro, ncol = 3)+
-  geom_vline(linetype="dashed", xintercept = hd_mean, color = "blue")+
-  geom_vline(linetype="dashed", xintercept = hd_med, color = "red")+
-  annotate("text", x=hd_mean+40, y=150, label="<- mean", size=2.5, color = "blue")+
-  annotate("text", x=hd_med-40, y=150, label="median ->", size=2.5, color = "red")
-
-#Box plot by metro_type
-train_data %>% ggplot(aes(x=metro, y=heart_disease_mortality_per_100k))+
-  xlab("")+
-  geom_boxplot()+
-  geom_hline(linetype="dashed", yintercept = hd_mean, color = "blue")+
-  geom_hline(linetype="dashed", yintercept = hd_med, color = "red")+
-  theme(axis.text.x = element_text(angle = 45, hjust=1, vjust=1))+
-  ggtitle("Metropolitan Type")+
-  annotate("text", x=.5, y=hd_mean+30, label="mean", size=3, color = "blue", angle=90)+
-  annotate("text", x=2.5, y=hd_med-30, label="median", size=3, color = "red", angle=90)
-```
-
-The box plots clearly show that metropolitan areas have a lower median than the population, while non-metropolitan areas skew higher than the population as a whole, making this a good cadidate for the predictive model.
-
-```{r, warning=FALSE}
-bind_rows(train_data %>% select(heart_disease_mortality_per_100k,
-                      metro) %>%
-  group_by(metro) %>%
-  summarize(mn = mean(heart_disease_mortality_per_100k),
-            md = median(heart_disease_mortality_per_100k)) %>%
-  mutate(MeanAboveBelow = ifelse(round(mn,1) < hd_mean, 
-                                 "Below",
-                                 ifelse(round(mn,1) == hd_mean,
-                                        "Equal", "Above")),
-         MedianAboveBelow = ifelse(round(md,1) < hd_med,
-                                   "Below",
-                                   ifelse(round(md,1) == hd_med,
-                                          "Equal", "Above"))) %>%
-  select(metro, mn, MeanAboveBelow, md, MedianAboveBelow)
-  , data.frame(metro = "Total Population Values", 
-               mn= hd_mean, 
-               MeanAboveBelow = "_",
-               md = hd_med,
-               MedianAboveBelow = "_")
-)
-```
-
 ##### Air Pollution
 Ambient air pollution for the county is presented in the data set as a measure of the concentration of fine particulate matter, as measured in µg/m^3^. These figures were presented as positive integers, so as a feature of the data set it is more akin to a categorical variable. Figure A shows the distribution of values.
 
@@ -818,6 +763,7 @@ $$P(obese & diabetes & physical inactivity) = P(obese) * P(diabetes) * P(phyisca
 
 By calculating these combined probabilities, we find features that have even stronger correlation that each individual feature
 ```{r}
+#Create new features
 train_data <- train_data %>% 
   mutate(p_diab_obese = health__pct_adult_obesity * health__pct_diabetes) %>%
   mutate(p_obese_inact = health__pct_adult_obesity * health__pct_physical_inactivity) %>%
@@ -872,20 +818,19 @@ The features chosen for use in the predictive model are
 
 * Economic Typology (categorical)
 * Population (categorical)
-* Metropolitan Type (categorical)
 * Air Pollution concentration (categorical)
 * Percent of Civilian Labor (numeric)
 * Percent non-Hispanic African American (numeric)
 * Death Rate per 1,000 (numeric)
 * Percent of adults with less than a High School diploma (numeric)
 * Percent of adults with Bachelor’s Degree or higher (numeric)
-* Percent of Adult Physical Inactivity (numeric)
 * Percent of adults that are obese and have diabetes (numeric)
 * Percent of adults that are obese and are physically inactive (numeric)
 * Percent of adults that have diabetes and are physically inactive (numeric)
 * Percent of adults that are obese, have diabetes and are physically inactive (numeric)
 
 ```{r}
+#Remove unused columns from the data set
 model_cols <- c("econ__economic_typology",
                 "population",
                 "metro",
@@ -895,7 +840,6 @@ model_cols <- c("econ__economic_typology",
                 "demo__death_rate_per_1k",
                 "demo__pct_adults_bachelors_or_higher",
                 "demo__pct_adults_less_than_a_high_school_diploma",
-                "health__pct_physical_inactivity",
                 "p_diab_obese",
                 "p_obese_inact",
                 "p_diab_inact",
