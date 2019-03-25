@@ -223,7 +223,9 @@ rt_fit <- rpart(heart_disease_mortality_per_100k ~ ., data = model_data,
 y_hat_rt <- predict(rt_fit)
 sqrt(mean((y_hat_rt-model_data$heart_disease_mortality_per_100k)^2, na.rm=TRUE))
 
-rt_pruned <- prune(rt_fit, cp=train_rt$bestTune)
+bt <- as.numeric(train_rt$bestTune[which.min(train_rt$bestTune)])
+
+rt_pruned <- prune(rt_fit, cp=bt)
 y_hat_pruned <- predict(rt_pruned)
 sqrt(mean((y_hat_pruned-model_data$heart_disease_mortality_per_100k)^2, na.rm=TRUE))
 
