@@ -12,6 +12,8 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(data.table)
 library(ggplot2)
+library(gridExtra)
+library(grid)
 path <- "/Users/edelmans/Documents/MSCapstone/"
 #path <- "C:/users/dedelman/desktop/capstone/"
 train_df <- read.csv(file=paste0(path,"train_values.csv"),
@@ -24,39 +26,23 @@ train_label <- read.csv(file=paste0(path,"train_labels.csv"),
 
 train_data <- merge(x=train_df, y=train_label, by="row_id")
 
+#Store the high, low, mean and median values for later use
 low_mort <- as.integer(min(train_data$heart_disease_mortality_per_100k))
 high_mort <- as.integer(max(train_data$heart_disease_mortality_per_100k))
 hd_mean = mean(train_data$heart_disease_mortality_per_100k)
 hd_med = median(train_data$heart_disease_mortality_per_100k)
 
+#Rename a typo in the data set
 train_data <- train_data %>% 
   mutate(health__pct_physical_inactivity = health__pct_physical_inacticity) %>%
   select(-health__pct_physical_inacticity)
 
 ```
+
 ```{r, eval=FALSE, echo=FALSE}
 train_data <- train_data %>% mutate(metro = ifelse(like(area__rucc, "Nonmetro"), "Nonmetro", "Metro"))
 
-train_data <- train_data %>% 
-  mutate(population = ifelse(like(train_data$area__rucc, "19,999"),"2.5-20k",
-                             ifelse(like(train_data$area__rucc, "less than 2,500"), "under 2.5k",
-                                    ifelse(like(train_data$area__rucc, "20,000"), "20-250k",
-                                           ifelse(like(train_data$area__rucc, "fewer than 250,000"), "20-250k", ##same group
-                                                  ifelse(like(train_data$area__rucc, "250,000"), "250k-1M",
-                                                         "1M+"))))))
 
-train_data$population <- factor(train_data$population, 
-                                levels=c("under 2.5k", "2.5-20k", "20-250k", "250k-1M", "1M+"))
-
-levels(train_data$area__rucc) <- c("Metro - 1 Million +",
-                                  "Metro - 250,000 to 1 Mil",
-                                  "Metro - less than 250,000",
-                                  "Nonmetro - Rural or < 2.5k, adjacent",
-                                  "Nonmetro - Rural or < 2.5k, non-adjacent",
-                                  "Nonmetro - 2,500 to 19,999, adjacent",
-                                  "Nonmetro - 2,500 to 19,999, non-adjacent",
-                                  "Nonmetro - 20,000 or more, adjacent",
-                                  "Nonmetro - 20,000 or more, non-adjacent"
                                   )
 
 
@@ -132,6 +118,7 @@ length(cat_cols)
 In a data set of this size, missing data can adversely affect the predictive value of individual features, so we look for any features that have a significant percentage of missing data
 
 ```{r}
+#What percentage of rows have NA values for all features?
 NAs <- data.frame(
   features = colnames(train_data %>% select(-heart_disease_mortality_per_100k, -yr, -row_id)),
   NA_pct = 
@@ -140,37 +127,44 @@ NAs <- data.frame(
                              -yr, -row_id),
              function(x){mean(ifelse(is.na(x), 1, 0))},
              simplify=TRUE)*100, digits=3) 
-) %>% arrange(desc(NA_pct))
+) 
 
-NAs
+#Show NA percentage from highest to lowest
+NAs %>% arrange(desc(NA_pct))
 ```
 
-We will remove predictors from the data set that have more than 10% missing values
-* health__homicides_per_100k
-* health__pct_excessive_drinking
-* health__pct_adult_smoking
-* health__motor_vehicle_crash_deaths_per_100k
+We will remove predictors from the data set that have more than 10% missing values. This turns out to be
+*health__homicides_per_100k
+*health__pct_excessive_drinking
+*health__pct_adult_smoking
+*health__motor_vehicle_crash_deaths_per_100k
 
 ```{r}
-train_data <- train_data %>% select(-health__homicides_per_100k,
-                                   -health__pct_excessive_drinking,
-                                  -health__pct_adult_smoking,
-                      -health__motor_vehicle_crash_deaths_per_100k)
+#Remove high NA features
+high_NA <- NAs %>% 
+  filter(NA_pct > 10) %>% 
+  .$features %>% 
+  as.character()
+
+train_data <- train_data %>% select(-high_NA)
 ```
 
 12 predictors have 0.0625% missing values, which equates to 2 rows. If it is the same two rows that are missing all of the predictors, we will just remove those rows from the data set.
 
 ```{r}
+#Which features have minimum number of NAs (> 0)
 min_missing <- min(NAs %>% filter(NA_pct > 0) %>% select(NA_pct))  
-sapply(train_data %>% 
+NA2 <- sapply(train_data %>% 
         select(as.vector(NAs$features[NAs$NA_pct == min_missing])),
        function(x){which(is.na(x))}, simplify=TRUE)
+t(NA2)
 ```
 
 We see that index 1090 and 1251 are missing all of the selected predictors, so we will remove them from the data set
 
 ```{r}
-train_data <- train_data[-c(1090, 1251), ]
+#Remove the rows with 12 NA predictors
+train_data <- train_data[-t(NA2)[1,c(1:2)], ]
 ```
 
 For the remaining NA values, we will decide how to handle after some exploratory data analysis of the features.
@@ -212,9 +206,32 @@ train_data %>% ggplot(aes(x=econ__economic_typology, y=heart_disease_mortality_p
 
 ```
 
-The histograms show that all of the typologies appear to be approximately normal. They also show that the mean from Recreation and from Farm-dependent (to a lesser degree) to be lower than the population mean. None of the typologies appear to have significantly higher means than the population average.  However, the box plots give a better picture of the distributions, showing that indeed Recreation and Farm-Dependent have their median value below the population average, while Manufacturing-dependent and Mining-dependent have medians well above the populate average (Non-specialized shows a very slight variation from the population mean and median).  The same results are shown below:
+The histograms show that all of the typologies appear to be approximately normal. They also show that the mean from Recreation and from Farm-dependent (to a lesser degree) to be lower than the population mean. None of the typologies appear to have significantly higher means than the population average.  However, the box plots give a better picture of the distributions, showing that indeed Recreation and Farm-Dependent have their median value below the population average, while Manufacturing-dependent and Mining-dependent have medians well above the population average (Non-specialized shows a very slight variation from the population mean and median).  The same results are shown below:
 
---do stuff with knitr or gridextra--
+```{r, warning=FALSE}
+#Show category mean/median and comparison to population
+bind_rows(train_data %>% select(heart_disease_mortality_per_100k,
+                      econ__economic_typology) %>%
+  group_by(econ__economic_typology) %>%
+  summarize(mn = mean(heart_disease_mortality_per_100k),
+            md = median(heart_disease_mortality_per_100k)) %>%
+  mutate(MeanAboveBelow = ifelse(round(mn,1) < round(hd_mean,1), 
+                              "Below",
+                             ifelse(round(mn,1) = round(hd_mean,1),
+                              "Equal", "Above")),
+         MedianAboveBelow = ifelse(round(md,1) < round(hd_med,1),
+                               "Below",
+                             ifelse(round(md,1) = round(hd_med,1),
+                              "Equal", "Above")))%>%
+  select(econ__economic_typology, mn, 
+         MeanAboveBelow, md, MedianAboveBelow)
+  , data.frame(econ__economic_typology = "Population",
+               mn= hd_mean, 
+               MeanAboveBelow = "",
+               md = hd_med,
+               MedianAboveBelow = "")
+)
+```
 
 Due to heart disease mortality rates being distributed differently across the economic typologies, this feature is a good candidate for use in a predictive model.
 
@@ -222,6 +239,18 @@ Due to heart disease mortality rates being distributed differently across the ec
 The individual values for “Area_RUCC” have populations ranging from < 100 to > 600, and histograms show that many distributions do not appear to be approximately normal.
 
 ```{r}
+#Rename original levels to show on plots
+levels(train_data$area__rucc) <- c("Metro - 1 Million +",
+                        "Metro - 250,000 to 1 Mil",
+                        "Metro - less than 250,000",
+                        "Nonmetro - Rural or < 2.5k, adjacent",
+                        "Nonmetro - Rural or < 2.5k, non-adjacent",
+                        "Nonmetro - 2,500 to 19,999, adjacent",
+                        "Nonmetro - 2,500 to 19,999, non-adjacent",
+                        "Nonmetro - 20,000 or more, adjacent",
+                        "Nonmetro - 20,000 or more, non-adjacent")
+
+#Histrograms of area__rucc
 train_data %>% ggplot(aes(x=heart_disease_mortality_per_100k))+
   xlab("heart_mort_100k")+
   geom_histogram(binwidth = (high_mort-low_mort)/40)+
@@ -236,8 +265,7 @@ However, we can transform them into population groups as a proxy for Area_RUCC. 
 
 --maybe stuff with knitr or gridextra instead--
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-library(gridExtra)
-library(grid)
+#Show area_rucc level mapping to population
 lvl <- levels(train_data$area__rucc)
 pop_lvl <- c("1M+", "250k-1M", "20-250K", "under 2,500", "under 2,500", "2.5-20K", "2.5-20k", "20-250K", "20-250K")
 
@@ -246,15 +274,29 @@ rucc_tab <- data.frame(Area_RUCC=lvl, Population=pop_lvl)
 grid.table(rucc_tab)
 ```
 
-```{r eval=FALSE}
-
+```{r}
+#Add "population" column using mapping
+#Note - 2 different patterns map to 20-250k
 train_data <- train_data %>% 
-  mutate(population = ifelse(like(train_data$area__rucc, "19,999"),"2.5-20k",
-                      ifelse(like(train_data$area__rucc, "less than 2,500"), "under 2.5k",
-                      ifelse(like(train_data$area__rucc, "20,000"), "20-250k",
-                      ifelse(like(train_data$area__rucc, "fewer than 250,000"), "20-250k", ##same group
-                      ifelse(like(train_data$area__rucc, "250,000"), "250k-1M",
-                     "1M+"))))))
+  mutate(population = ifelse(like(train_data$area__rucc,
+                                  "19,999"), "2.5-20k",
+                      ifelse(like(train_data$area__rucc,
+                                  "2.5k"), "under 2.5k",
+                      ifelse(like(train_data$area__rucc,
+                                  "20,000"), "20-250k",
+                      ifelse(like(train_data$area__rucc,
+                                  "fewer than 250,000"), "20-250k",
+                      ifelse(like(train_data$area__rucc,
+                                  "250,000"), "250k-1M",
+                         "1M+"))))))
+
+#Force population into a factor
+train_data$population <- factor(train_data$population, 
+                                levels=c("under 2.5k",
+                                         "2.5-20k",
+                                         "20-250k",
+                                         "250k-1M", "1M+"))
+
 ```
 
 Looking at the histograms we now see a more even spread of data and more normal distributions.
@@ -289,13 +331,39 @@ train_data %>%
 
 Here we can more clearly see that the median for “under 2.5K”, “250K-1M” and “1M+” are all below the population mean and median. The group “2.5-20K” has a median well above the population mean and median, while the “20-250K” group median is only slightly higher than the population.
 
---do stuff with knitr or gridextra--
+```{r, warning=FALSE}
+bind_rows(train_data %>% select(heart_disease_mortality_per_100k,
+                      population) %>%
+  group_by(population) %>%
+  summarize(mn = mean(heart_disease_mortality_per_100k),
+            md = median(heart_disease_mortality_per_100k)) %>%
+  mutate(MeanAboveBelow = ifelse(round(mn,1) < hd_mean, 
+                                 "Below",
+                                 ifelse(round(mn,1) == hd_mean,
+                                        "Equal", "Above")),
+         MedianAboveBelow = ifelse(round(md,1) < hd_med,
+                                   "Below",
+                                   ifelse(round(md,1) == hd_med,
+                                          "Equal", "Above"))) %>%
+  select(population, mn, MeanAboveBelow, md, MedianAboveBelow)
+  , data.frame(population = "Population", 
+               mn= hd_mean, 
+               MeanAboveBelow = "",
+               md = hd_med,
+               MedianAboveBelow = "")
+)
+```
 
 With population groups showing a different distribution for heart mortality rates, this calculated feature is another good candidate for use in a predictive model.
 
-The analysis went one step further and grouped the RUCC values based on whether or not the county was considered to be a metropolitan area or not.  Based solely on the first word in the RUCC category title (see Table 2), each county was classified as either “Metro” or “Non-Metro”.
+The analysis went one step further and grouped the RUCC values based on whether or not the county was considered to be a metropolitan area or not.  Based solely on the first word in the RUCC category title, each county was classified as either “Metro” or “Non-Metro”.
 
 ```{r}
+#Group into metro/non-metro
+train_data <- train_data %>% 
+  mutate(metro = ifelse(like(area__rucc, "Nonmetro"), 
+                        "Nonmetro", "Metro"))
+
 #Histograms by metro type
 train_data %>% ggplot(aes(x=heart_disease_mortality_per_100k))+
   xlab("heart_mort_100k")+
@@ -320,7 +388,28 @@ train_data %>% ggplot(aes(x=metro, y=heart_disease_mortality_per_100k))+
 
 The box plots clearly show that metropolitan areas have a lower median than the population, while non-metropolitan areas skew higher than the population as a whole.
 
---do stuff with knitr or gridextra--
+```{r, warning=FALSE}
+bind_rows(train_data %>% select(heart_disease_mortality_per_100k,
+                      metro) %>%
+  group_by(metro) %>%
+  summarize(mn = mean(heart_disease_mortality_per_100k),
+            md = median(heart_disease_mortality_per_100k)) %>%
+  mutate(MeanAboveBelow = ifelse(round(mn,1) < hd_mean, 
+                                 "Below",
+                                 ifelse(round(mn,1) == hd_mean,
+                                        "Equal", "Above")),
+         MedianAboveBelow = ifelse(round(md,1) < hd_med,
+                                   "Below",
+                                   ifelse(round(md,1) == hd_med,
+                                          "Equal", "Above"))) %>%
+  select(population, mn, MeanAboveBelow, md, MedianAboveBelow)
+  , data.frame(metro = "Population", 
+               mn= hd_mean, 
+               MeanAboveBelow = "",
+               md = hd_med,
+               MedianAboveBelow = "")
+)
+```
 
 ##### Air Pollution
 Ambient air pollution for the county is presented in the data set as a measure of the concentration of fine particulate matter, as measured in µg/m^3^. These figures were presented as positive integers, so as a feature of the data set it is more akin to a categorical variable.  The initial spread of values showed a large discrepancy in population size, especially in the min and max regions (A), so values were grouped into a smaller number of populations that were closer in size (B)

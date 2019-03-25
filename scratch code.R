@@ -1,3 +1,25 @@
+#Build categorical mean/median tables
+bind_rows(train_data %>% select(heart_disease_mortality_per_100k,
+                      population) %>%
+  group_by(population) %>%
+  summarize(mn = mean(heart_disease_mortality_per_100k),
+            md = median(heart_disease_mortality_per_100k)) %>%
+  mutate(MeanAboveBelow = ifelse(round(mn,1) < hd_mean, 
+                                 "Below",
+                                 ifelse(round(mn,1) == hd_mean,
+                                        "Equal", "Above")),
+         MedianAboveBelow = ifelse(round(md,1) < hd_med,
+                                   "Below",
+                                   ifelse(round(md,1) == hd_med,
+                                          "Equal", "Above"))) %>%
+  select(population, mn, MeanAboveBelow, md, MedianAboveBelow)
+  , data.frame(population = "Population", 
+               mn= hd_mean, 
+               MeanAboveBelow = "",
+               md = hd_med,
+               MedianAboveBelow = "")
+)
+
 cols <- colnames(train_data)[like(colnames(train_data), "demo__pct")]
 cols <- cols[!like(cols, "health_")]
 ncol <- ifelse(length(cols) <= 6, 2, 3)
@@ -155,13 +177,20 @@ NAs <- data.frame(
 ) 
 NAs %>% arrange(desc(NA_pct))
 
+high_NA <- NAs %>% filter(NA_pct > 10) %>% .$features %>% as.character()
+
+head(train_data %>% select(-high_NA))
+
 na2 <- as.vector(NAs$features[NAs$NA_pct == 0.0625])
 str(train_data %>% select(as.vector(NAs$features[NAs$NA_pct == 0.0625]))) %>%
 
 min_missing <- min(NAs %>% filter(NA_pct > 0) %>% select(NA_pct))  
-sapply(train_data %>% 
+NA2 <- sapply(train_data %>% 
          select(as.vector(NAs$features[NAs$NA_pct == min_missing])),
        function(x){which(is.na(x))}, simplify=TRUE)
+
+train_data[t(NA2)[1,c(1:2)], ]
+
 
 #plot distros of numeric data
 train_data %>% select(cont_cols) %>%
