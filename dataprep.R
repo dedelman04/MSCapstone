@@ -195,6 +195,8 @@ model_data <- cbind(train_data %>% select(heart_disease_mortality_per_100k, cat_
 
 #model_data <- train_data
 
+#####Modelling#####
+
 #Linear regression model
 lm_form <- as.formula(paste("heart_disease_mortality_per_100k ~ ", paste(model_cols, collapse="+")))
 
@@ -210,11 +212,12 @@ sqrt(mean((y_hat-test_set$heart_disease_mortality_per_100k)^2, na.rm=TRUE))
 #Cross-validation LM
 x <- model_data %>% select(model_cols)
 y <- model_data$heart_disease_mortality_per_100k
+control <- trainControl(method="cv", number=100, p=.9)
 
-lm_fit <- train(x, y, method="lm", metric="RMSE")
+lm_fit <- train(x, y, method="lm", metric="RMSE", trControl=control)
 lm_fit$results
 
-y_hat_cv <- predict(lm_fit, test_set)
+y_hat_cv <- predict(lm_fit$finalModel, test_set)
 sqrt(mean((y_hat_cv-test_set$heart_disease_mortality_per_100k)^2, na.rm=TRUE))
 
 #Regression Trees
@@ -237,3 +240,30 @@ ggplot(train_rt)
 
 plot(train_rt$finalModel, margin=0.1)
 text(train_rt$finalModel, cex=0.5)
+
+#Random Forests
+library(randomForest)
+
+train_rf <- randomForest(heart_disease_mortality_per_100k ~ ., data=model_data)
+
+library(Rborist)
+fit_rf <- train(heart_disease_mortality_per_100k ~ .,
+                method="Rborist",
+                tuneGrid=data.frame(predFixed=2, minNode = seq(3,50) ),
+                data=train_set)
+
+y_hat_rf <- predict(fit_rf, test_set)
+sqrt(mean((y_hat_rf-test_set$heart_disease_mortality_per_100k)^2, na.rm=TRUE))
+
+results <- rbind(data.frame(method = "lm", 
+                            RMSE = sqrt(mean((y_hat-test_set$heart_disease_mortality_per_100k)^2, na.rm=TRUE))),
+                 data.frame(method="lm xv",
+                            RMSE=sqrt(mean((y_hat_cv-test_set$heart_disease_mortality_per_100k)^2, na.rm=TRUE))),
+                 data.frame(method="Reg Tree - pruned",
+                            RMSE=sqrt(mean((y_hat_pruned-model_data$heart_disease_mortality_per_100k)^2, na.rm=TRUE))),
+                 data.frame(method="randomForest",
+                            RMSE=sqrt(mean((train_rf$predicted - model_data$heart_disease_mortality_per_100k)^2))),
+                 data.frame(method="trained Rborist",
+                            RMSE=sqrt(mean((y_hat_rf-test_set$heart_disease_mortality_per_100k)^2, na.rm=TRUE))))
+
+write.csv(results, "model_results.csv")

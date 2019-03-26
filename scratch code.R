@@ -410,3 +410,23 @@ train_data %>% ggplot(aes(x=air_pollution, y=heart_disease_mortality_per_100k))+
   ggtitle("Air Pollution (mcg/m^3)")+theme(plot.title = element_text(hjust=0.5))+
   annotate("text", x=.5, y=hd_mean+30, label="mean", size=3, color = "blue", angle=90)+
   annotate("text", x=5.5, y=hd_med-30, label="median", size=3, color = "red", angle=90)
+
+
+ranges <- sapply(train_data %>% select(num_cols), range, simplify=TRUE)
+data.frame(MIN = min(ranges[1,]), MAX = max(ranges[2,]))
+
+
+data_scale <- scale(train_data[num_cols])
+ranges <- sapply(data_scale, range, simplify=TRUE)
+print ("Scale/Z-score")
+data.frame(MIN = min(ranges[1,]), MAX = max(ranges[2,]))
+
+data_scale <- sapply(train_data[num_cols], function(x) {x^(1/3)}, simplify=TRUE)
+ranges <- sapply(data_scale, range, simplify=TRUE)
+print ("Cube Root")
+data.frame(MIN = min(ranges[1,]), MAX = max(ranges[2,]))
+
+data_scale <- sapply(train_data[num_cols], sqrt, simplify=TRUE)
+ranges <- sapply(data_scale, range, simplify=TRUE)
+print ("Square Root")
+data.frame(MIN = min(ranges[1,]), MAX = max(ranges[2,]))

@@ -39,19 +39,10 @@ train_data <- train_data %>%
 
 ```
 
-```{r, eval=FALSE, echo=FALSE}
-train_data <- train_data %>% mutate(metro = ifelse(like(area__rucc, "Nonmetro"), "Nonmetro", "Metro"))
-
-
-                                  )
-
-
-```
-
 ## Executive Summary
 Heart disease is one of the leading causes of death in the United States. This document presents an analysis of county-by-county heart disease mortality rates (per 100,000 individuals) and uses various demographic statistics to build a model that predicts the heart disease mortality rate for that county
 
-The given data set, containing known heart disease mortality rates, comprises 3198 observations, representing 1599 counties and data collected over two separate years.  Both categorical and numeric data are present in the feature set, and after some initial data exploration, several other features were calculated. A predictive regression model was then created using select features in order to predict the heart disease mortality rate of 3080 county/year pairs, representing 1540 distinct counties.
+The given data set, containing known heart disease mortality rates, comprises 3198 observations, representing 1599 counties and data collected over two separate years.  Both categorical and numeric data are present in the feature set, and after some initial data exploration, several other features were calculated. A predictive regression model was then created using select features in order to predict the heart disease mortality rate.
 
 While building and tuning the predictive model, the following features were deemed significant to the predictive power of the model:
 
@@ -59,7 +50,6 @@ While building and tuning the predictive model, the following features were deem
 ### Area Information
 * Area RUCC (Rural-Urban Continuum Codes) – classifies each county into one of 9 mutually exclusive categories that identifies (a) the population size, (b) the degree of urbanization and (c) proximity to a metropolitan area.
     + While the RUCC itself did now show any strong correlation to heart disease mortality rate, by combining one or more RUCC values into one of 5 groups based solely on population size, the data showed 3 population groups that skewed below the mean heart disease mortality rate and 1 that skewed above the mean.
-    + Additionally, classifying the RUCC values into another calculated feature as “Metro” or “Non-Metro” showed the data being skewed below the mean for Metro and above the men for Non-Metro, adding an enhancement to the predictive model (data source: USDA Economic Research Service)
 
 ### Economic Factors
 * Economic Typology – classifies each county into one of 6 mutually exclusive categories of economic dependence; two categories show a distribution skewed below the mean heart disease mortality rate and two categories are skewed above (source: USDA Economic Research Service).
@@ -68,12 +58,13 @@ While building and tuning the predictive model, the following features were deem
 ### Demographics
 * Percent of non-Hispanic African Americans – analysis shows the strongest positive correlation among the 5 race/ethnicity groups (source: US Census Population Estimates)
 * Percent of adults with less than a high-school diploma; percent of adults with a Bachelor’s degree (or higher) – the former shows a strong positive correlation, while the latter shows an equally strong negative correlation (source: US Census Population Estimates)
+* Death Rate per 1000 individuals - analysis shows a high-moderate correlation (source: US Census Population Estimates)
 
 ### Health Factors
 * Air Pollution Particulate Matter – measured in µg/m3; the average concentration of fine particulate matter as measured over the year. Lower concentrations skewed below the population mean while higher concentrations skewed above (source: CDC WONDER).
 * Percent of physical inactivity – percent of adult population that self-identifies as physically inactive (source: National Center for Chronic Disease Prevention and Health Promotion); physical inactivity showed a moderately strong correlation to heart disease mortality rate
-* Percent of adult obesity; percent of diabetes; percent of adult smoking – each of the three factors individually showed a strong correlation with heart disease mortality rate, but with a thought experiment and some data transformation into combined factors, an even stronger correlation was found (sources NCCDPHP; NCCDPHP, Division of Diabetes Translation; Behavioral Risk Factor Surveillance System)
-* Homicide, Motor Vehicle Death rates per 100,000 – two separate death rates (per 100,000 individuals); by scaling each rate to a logarithmic scale (base 10), a strong correlation to heart disease mortality rate was found (source: National Center for Health Statistics)
+* Percent of adult obesity; percent of diabetes – each of the two factors individually showed a strong correlation with heart disease mortality rate, but with a thought experiment and some data transformation into combined factors, an even stronger correlation was found (sources NCCDPHP; NCCDPHP, Division of Diabetes Translation)
+
 
 ## Data Exploration and Initial Analysis
 ### Heart Disease Mortality Rate
@@ -833,7 +824,6 @@ The features chosen for use in the predictive model are
 #Remove unused columns from the data set
 model_cols <- c("econ__economic_typology",
                 "population",
-                "metro",
                 "air_pollution",
                 "econ__pct_civilian_labor",
                 "demo__pct_non_hispanic_african_american",
@@ -871,4 +861,68 @@ train_data %>% select(num_cols) %>%
   facet_wrap(~ feature, scales="free")
 ```
 
-The continuous features show an approximate normal distribution (although some are skewed), with the exception of "Percent non-Hispanic African American" and "Percent of adults with less than a High School diploma".
+The continuous features show an approximate normal distribution (although some are skewed), with the exception of "Percent non-Hispanic African American" and "Percent of adults with less than a High School diploma". With approximate normal features, there are several options to consider for normalization:
+
+* Scaling/z-score
+* Cube Root
+* Square Root
+* Log10
+* Natural Log (Log e)
+
+For the logarithmic transformations, the data would have to be completely free of negative and zero values. Looking at the overall range of the data
+
+```{r}
+#Find overall range of predictors by taking min and max of individual predictor ranges
+ranges <- sapply(train_data %>% select(num_cols), range, simplify=TRUE)
+data.frame(MIN = min(ranges[1,]), MAX = max(ranges[2,]))
+```
+
+we see that there is at least one feature with a 0 data point. Since we cannot assume that 0 is an invalid data point, we must exclude the logarithmic transformations.
+
+Similary, were there any features with negative values, we could not use the square root transformation, but that is not the case here.
+
+We apply the scale, cube root and square root transformations and look at the resulting features
+
+```{r}
+#Apply scale, plot distributions, show range
+data_scale <- scale(train_data[num_cols])
+as.data.frame(data_scale) %>% 
+  gather(feature, value) %>%
+  ggplot(aes(x=value)) + geom_histogram(bins=50) +
+  facet_wrap(~ feature, scales="free")
+ranges <- sapply(data_scale, range, simplify=TRUE)
+#Scale/Z-score
+data.frame(MIN = min(ranges[1,]), MAX = max(ranges[2,]))
+
+#Apply cube root transformation, plot distributions, show range
+data_scale <- sapply(train_data[num_cols], function(x) {x^(1/3)}, simplify=TRUE)
+as.data.frame(data_scale) %>% 
+  gather(feature, value) %>%
+  ggplot(aes(x=value)) + geom_histogram(bins=50) +
+  facet_wrap(~ feature, scales="free")
+ranges <- sapply(data_scale, range, simplify=TRUE)
+#Cube Root
+data.frame(MIN = min(ranges[1,]), MAX = max(ranges[2,]))
+
+#Apply square root transformation, plot distributions, show range
+data_scale <- sapply(train_data[num_cols], sqrt, simplify=TRUE)
+as.data.frame(data_scale) %>% 
+  gather(feature, value) %>%
+  ggplot(aes(x=value)) + geom_histogram(bins=50) +
+  facet_wrap(~ feature, scales="free")
+ranges <- sapply(data_scale, range, simplify=TRUE)
+#Square Root
+data.frame(MIN = min(ranges[1,]), MAX = max(ranges[2,]))
+```
+
+While the Scale/Z-Score transformation gives us the largest overall range of the three, the histograms show that all features are now within the same order of magnitude (while cube root and square root still have Death Rate per 1000 above 1 and all percentages below 1). We will apply the Scale transformation to the data set and then create the regression models.
+
+```{r}
+#Create new DF with the scaled data
+model_data <- cbind(train_data %>% select(heart_disease_mortality_per_100k, cat_cols),
+                    sapply(train_data[num_cols], scale, simplify=TRUE))
+```
+
+###Creating and evaluation regression models
+
+
