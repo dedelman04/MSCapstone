@@ -923,6 +923,6 @@ model_data <- cbind(train_data %>% select(heart_disease_mortality_per_100k, cat_
                     sapply(train_data[num_cols], scale, simplify=TRUE))
 ```
 
-###Creating and evaluation regression models
+###Creating and evaluating regression models
 
 

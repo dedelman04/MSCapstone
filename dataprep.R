@@ -246,6 +246,16 @@ library(randomForest)
 
 train_rf <- randomForest(heart_disease_mortality_per_100k ~ ., data=model_data)
 
+train_rf_full <- randomForest(x=train_set[model_cols],
+                              y=train_set$heart_disease_mortality_per_100k,
+                              xtest = test_set[model_cols]
+                              )
+
+fit_rf_full <- train(method="rf",
+                     x=train_set[model_cols],
+                     y=train_set$heart_disease_mortality_per_100k,
+                     tuneGrid = data.frame(mtry = seq(1,11)))
+
 library(Rborist)
 fit_rf <- train(heart_disease_mortality_per_100k ~ .,
                 method="Rborist",
@@ -263,6 +273,8 @@ results <- rbind(data.frame(method = "lm",
                             RMSE=sqrt(mean((y_hat_pruned-model_data$heart_disease_mortality_per_100k)^2, na.rm=TRUE))),
                  data.frame(method="randomForest",
                             RMSE=sqrt(mean((train_rf$predicted - model_data$heart_disease_mortality_per_100k)^2))),
+                 data.frame(method="randomForest, train/test",
+                            RMSE=sqrt(mean((train_rf_full$test$predicted-test_set$heart_disease_mortality_per_100k)^2))),
                  data.frame(method="trained Rborist",
                             RMSE=sqrt(mean((y_hat_rf-test_set$heart_disease_mortality_per_100k)^2, na.rm=TRUE))))
 
