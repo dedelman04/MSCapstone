@@ -7,13 +7,12 @@ library(caret)
 library(Matrix)
 library(rpart)
 
-#path <- "/Users/edelmans/Documents/MSCapstone/"
-path <- "C:/users/dedelman/desktop/capstone/"
-train_df <- read.csv(file=paste0(path,"train_values.csv"),
+#Load and join data
+train_df <- read.csv(file="train_values.csv",
                      header=TRUE,
                      stringsAsFactors = TRUE)
 
-train_label <- read.csv(file=paste0(path,"train_labels.csv"),
+train_label <- read.csv(file="train_labels.csv",
                         header=TRUE,
                         stringsAsFactors = TRUE)
 
@@ -85,13 +84,6 @@ train_data$population <- factor(train_data$population,
                                          "20-250k",
                                          "250k-1M", "1M+"))
 
-#Group into metro/non-metro
-train_data <- train_data %>% 
-  mutate(metro = ifelse(like(area__rucc, "Nonmetro"), 
-                        "Nonmetro", "Metro"))
-
-#Since Metro is below mean, Nonmetro above mean, replace with 1, -1
-#train_data$metro <- train_data %>% mutate(metro = ifelse(like(metro, "Nonmetro"), -1, 1))
 
 #Find median, replace NA values with median of air polltion across all population
 ap_med <- median(train_data$health__air_pollution_particulate_matter, na.rm=TRUE)
@@ -124,7 +116,6 @@ train_data <- train_data %>%
 #Remove unused columns from the data set
 model_cols <- c("econ__economic_typology",
                 "population",
-#                "metro",
                 "air_pollution",
                 "econ__pct_civilian_labor",
                 "demo__pct_non_hispanic_african_american",
@@ -149,113 +140,143 @@ num_cols <- train_data %>%
 cat_cols <- colnames(train_data)[sapply(train_data, is.factor)]
 
 #Normalize the continuous variables
- #Using scale
-data_scale <- scale(train_data[num_cols])
-
-#as.data.frame(data_scale) %>%
-#  gather(feature, value) %>%
-#  ggplot(aes(x=value)) + geom_histogram(bins=50) +
-#  facet_wrap(~ feature, scales="free_y")+ggtitle("Scale")
-
- #Using cube root
-data_scale <- sapply(train_data[num_cols], function(x) {x^(1/3)}, simplify=TRUE)
-
-#as.data.frame(data_scale) %>%
-#  gather(feature, value) %>%
-#  ggplot(aes(x=value)) + geom_histogram(bins=50) +
-#  facet_wrap(~ feature, scales="free_y")+ggtitle("Cube root")
-
- #Using square root
-data_scale <- sapply(train_data[num_cols], function(x) {sqrt(x)}, simplify=TRUE)
-
-#as.data.frame(data_scale) %>%
-#  gather(feature, value) %>%
-#  ggplot(aes(x=value)) + geom_histogram(bins=50) +
-#  facet_wrap(~ feature, scales="free_y")+ggtitle("Square root")
-
- #Using log 10
-data_scale <- sapply(train_data[num_cols], function(x) {log10(x)}, simplify=TRUE)
-
-#as.data.frame(data_scale) %>%
-#  gather(feature, value) %>%
-#  ggplot(aes(x=value)) + geom_histogram(bins=50) +
-#  facet_wrap(~ feature, scales="free_y")+ggtitle("Log 10")
-
- #Using ln
-data_scale <- sapply(train_data[num_cols], function(x) {log(x)}, simplify=TRUE)
-
-#as.data.frame(data_scale) %>%
-#  gather(feature, value) %>%
-#  ggplot(aes(x=value)) + geom_histogram(bins=50) +
-#  facet_wrap(~ feature, scales="free_y")+ggtitle("Ln")
-
 #Create new DF with the scaled data
 model_data <- cbind(train_data %>% select(heart_disease_mortality_per_100k, cat_cols),
                                    sapply(train_data[num_cols], scale, simplify=TRUE))
 
-#model_data <- train_data
+
 
 #####Modelling#####
 
-#Linear regression model
-lm_form <- as.formula(paste("heart_disease_mortality_per_100k ~ ", paste(model_cols, collapse="+")))
-
+###Train and test sets
 set.seed(999)
 test_index <- createDataPartition(model_data$heart_disease_mortality_per_100k, times = 1, p=0.5, list=FALSE)
 train_set <- model_data[-test_index, ] 
 test_set <- model_data[test_index, ]
 
-fit <- lm(formula = lm_form, data = train_set)
+###Linear regression model###
+fit <- lm(formula = heart_disease_mortality_per_100k ~ ., data = train_set)
 y_hat <- predict(fit, test_set)
-sqrt(mean((y_hat-test_set$heart_disease_mortality_per_100k)^2, na.rm=TRUE))
+sqrt(mean((y_hat-test_set$heart_disease_mortality_per_100k)^2))
 
-#Cross-validation LM
-x <- model_data %>% select(model_cols)
-y <- model_data$heart_disease_mortality_per_100k
-control <- trainControl(method="cv", number=100, p=.9)
+#Store results
+results <- data.frame(method = "lm", 
+                      RMSE = sqrt(mean((y_hat-test_set$heart_disease_mortality_per_100k)^2)),
+                      TrainVal="N/A")
 
-lm_fit <- train(x, y, method="lm", metric="RMSE", trControl=control)
-lm_fit$results
+###Linear regression model###
 
-y_hat_cv <- predict(lm_fit$finalModel, test_set)
-sqrt(mean((y_hat_cv-test_set$heart_disease_mortality_per_100k)^2, na.rm=TRUE))
 
-#Regression Trees
+###Regression Trees###
+##Fit entire dataset##
+#Start with complexity parameter = 0 then prune
 rt_fit <- rpart(heart_disease_mortality_per_100k ~ ., data = model_data,
                 control = rpart.control(cp=0, minsplit=2))
 y_hat_rt <- predict(rt_fit)
-sqrt(mean((y_hat_rt-model_data$heart_disease_mortality_per_100k)^2, na.rm=TRUE))
+#We know this is going to be 0 as each row is its own node
+sqrt(mean((y_hat_rt-model_data$heart_disease_mortality_per_100k)^2))
 
-bt <- as.numeric(train_rt$bestTune[which.min(train_rt$bestTune)])
+results <- rbind(results,
+                 data.frame(method="Regression Tree, Full data, CP=0",
+                            RMSE = sqrt(mean((y_hat_rt-model_data$heart_disease_mortality_per_100k)^2)),
+                            TrainVal = "N/A")
+)
 
-rt_pruned <- prune(rt_fit, cp=bt)
-y_hat_pruned <- predict(rt_pruned)
-sqrt(mean((y_hat_pruned-model_data$heart_disease_mortality_per_100k)^2, na.rm=TRUE))
-
+#Train the complexity parameter                 
 train_rt <- train(heart_disease_mortality_per_100k ~ .,
                   method = "rpart",
-                  tuneGrid = data.frame(cp = seq(0, 0.05, len=25)),
+                  tuneGrid = data.frame(cp = seq(0, 0.05, len=100)),
                   data = model_data)
 ggplot(train_rt)
 
-plot(train_rt$finalModel, margin=0.1)
-text(train_rt$finalModel, cex=0.5)
+bt <- as.numeric(train_rt$bestTune[which.min(train_rt$bestTune)])
 
-#Random Forests
+#Prune the regression tree using the best cp parameter
+rt_pruned <- prune(rt_fit, cp=bt)
+y_hat_pruned <- predict(rt_pruned)
+sqrt(mean((y_hat_pruned - model_data$heart_disease_mortality_per_100k)^2))
+
+results <- rbind(results,
+                 data.frame(method="Reg Tree Full data - pruned",
+                            RMSE=sqrt(mean((y_hat_pruned-model_data$heart_disease_mortality_per_100k)^2)),
+                            TrainVal = paste("cp", format(bt, digits=3), sep="=")))
+
+##Fit entire dataset##
+
+##Train set##
+#Start with complexity parameter = 0 then prune
+rt_fit <- rpart(heart_disease_mortality_per_100k ~ ., data = train_set,
+                control = rpart.control(cp=0, minsplit=2))
+y_hat_rt <- predict(rt_fit, train_set)
+#We know this is going to be 0 as each row is its own node
+sqrt(mean((y_hat_rt - train_set$heart_disease_mortality_per_100k)^2))
+
+results <- rbind(results,
+                 data.frame(method="Regression Tree, Train, CP=0",
+                            RMSE = sqrt(mean((y_hat_rt - train_set$heart_disease_mortality_per_100k)^2)),
+                            TrainVal="N/A")
+)
+
+#Train the complexity parameter                 
+train_rt <- train(heart_disease_mortality_per_100k ~ .,
+                  method = "rpart",
+                  tuneGrid = data.frame(cp = seq(0, 0.05, len=100)),
+                  data = train_set)
+ggplot(train_rt)
+
+bt_train <- as.numeric(train_rt$bestTune[which.min(train_rt$bestTune)])
+
+#Prune the regression tree using the best cp parameter; predict against test set
+rt_pruned <- prune(rt_fit, cp=bt_train)
+y_hat_pruned <- predict(rt_pruned, test_set)
+sqrt(mean((y_hat_pruned - test_set$heart_disease_mortality_per_100k)^2))
+
+results <- rbind(results,
+                 data.frame(method="Reg Tree - pruned; train/test",
+                            RMSE=sqrt(mean((y_hat_pruned - test_set$heart_disease_mortality_per_100k)^2)),
+                            TrainVal = paste("cp", format(bt_train, digits=3), sep="=")))
+###Regression Trees###
+
+
+###Random Forests###
 library(randomForest)
 
+##randomForest
+#Simple random forest with entire data set
 train_rf <- randomForest(heart_disease_mortality_per_100k ~ ., data=model_data)
 
+results <- rbind(results,
+                 data.frame(method="randomForest",
+                            RMSE=sqrt(mean((train_rf$predicted - model_data$heart_disease_mortality_per_100k)^2)),
+                            TrainVal = "N/A"))
+
+#Simple random forest with train/test set
 train_rf_full <- randomForest(x=train_set[model_cols],
                               y=train_set$heart_disease_mortality_per_100k,
                               xtest = test_set[model_cols]
                               )
 
+results <- rbind(results,
+                 data.frame(method="randomForest, train/test",
+                            RMSE=sqrt(mean((train_rf_full$test$predicted - test_set$heart_disease_mortality_per_100k)^2)),
+                            TrainVal = "N/A"))
+
+#Cross-validate over the mtry parameter
 fit_rf_full <- train(method="rf",
                      x=train_set[model_cols],
                      y=train_set$heart_disease_mortality_per_100k,
                      tuneGrid = data.frame(mtry = seq(1,11)))
 
+y_hat_rf_full <- predict(fit_rf_full$finalModel, test_set)
+
+results <- rbind(results, 
+                 data.frame(method="randomForest trained",
+                            RMSE = sqrt(mean((y_hat_rf_full - test_set$heart_disease_mortality_per_100k)^2, na.rm=TRUE)),
+                            TrainVal = paste("mtry", fit_rf_full$bestTune$mtry, sep="=")))
+##randomForest
+
+##Rborist
+#Cross validate Rborist method over minNode parameter
 library(Rborist)
 fit_rf <- train(heart_disease_mortality_per_100k ~ .,
                 method="Rborist",
@@ -263,19 +284,14 @@ fit_rf <- train(heart_disease_mortality_per_100k ~ .,
                 data=train_set)
 
 y_hat_rf <- predict(fit_rf, test_set)
-sqrt(mean((y_hat_rf-test_set$heart_disease_mortality_per_100k)^2, na.rm=TRUE))
+sqrt(mean((y_hat_rf-test_set$heart_disease_mortality_per_100k)^2))
 
-results <- rbind(data.frame(method = "lm", 
-                            RMSE = sqrt(mean((y_hat-test_set$heart_disease_mortality_per_100k)^2, na.rm=TRUE))),
-                 data.frame(method="lm xv",
-                            RMSE=sqrt(mean((y_hat_cv-test_set$heart_disease_mortality_per_100k)^2, na.rm=TRUE))),
-                 data.frame(method="Reg Tree - pruned",
-                            RMSE=sqrt(mean((y_hat_pruned-model_data$heart_disease_mortality_per_100k)^2, na.rm=TRUE))),
-                 data.frame(method="randomForest",
-                            RMSE=sqrt(mean((train_rf$predicted - model_data$heart_disease_mortality_per_100k)^2))),
-                 data.frame(method="randomForest, train/test",
-                            RMSE=sqrt(mean((train_rf_full$test$predicted-test_set$heart_disease_mortality_per_100k)^2))),
+results <- rbind(results,
                  data.frame(method="trained Rborist",
-                            RMSE=sqrt(mean((y_hat_rf-test_set$heart_disease_mortality_per_100k)^2, na.rm=TRUE))))
+                            RMSE=sqrt(mean((y_hat_rf - test_set$heart_disease_mortality_per_100k)^2, na.rm=TRUE))))
 
-write.csv(results, "model_results.csv")
+##Rborist
+###Random Forests###
+
+#write.csv(results, "model_results.csv", row.names = FALSE)
+#results <- read.csv("model_results.csv", stringsAsFactors = FALSE)

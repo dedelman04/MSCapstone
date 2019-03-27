@@ -430,3 +430,29 @@ data_scale <- sapply(train_data[num_cols], sqrt, simplify=TRUE)
 ranges <- sapply(data_scale, range, simplify=TRUE)
 print ("Square Root")
 data.frame(MIN = min(ranges[1,]), MAX = max(ranges[2,]))
+
+#Using scale
+data_scale <- scale(train_data[num_cols])
+
+#as.data.frame(data_scale) %>%
+#  gather(feature, value) %>%
+#  ggplot(aes(x=value)) + geom_histogram(bins=50) +
+#  facet_wrap(~ feature, scales="free_y")+ggtitle("Scale")
+
+#Using cube root
+data_scale <- sapply(train_data[num_cols], function(x) {x^(1/3)}, simplify=TRUE)
+
+#as.data.frame(data_scale) %>%
+#  gather(feature, value) %>%
+#  ggplot(aes(x=value)) + geom_histogram(bins=50) +
+#  facet_wrap(~ feature, scales="free_y")+ggtitle("Cube root")
+
+#Using square root
+data_scale <- sapply(train_data[num_cols], function(x) {sqrt(x)}, simplify=TRUE)
+
+#as.data.frame(data_scale) %>%
+#  gather(feature, value) %>%
+#  ggplot(aes(x=value)) + geom_histogram(bins=50) +
+#  facet_wrap(~ feature, scales="free_y")+ggtitle("Square root")
+
+

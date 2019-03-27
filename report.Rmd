@@ -14,13 +14,15 @@ library(data.table)
 library(ggplot2)
 library(gridExtra)
 library(grid)
-#path <- "/Users/edelmans/Documents/MSCapstone/"
-path <- "C:/users/dedelman/desktop/capstone/"
-train_df <- read.csv(file=paste0(path,"train_values.csv"),
+library(caret)
+library(Matrix)
+library(rpart)
+
+train_df <- read.csv(file="train_values.csv",
                   header=TRUE,
                   stringsAsFactors = TRUE)
 
-train_label <- read.csv(file=paste0(path,"train_labels.csv"),
+train_label <- read.csv(file="train_labels.csv",
                         header=TRUE,
                         stringsAsFactors = TRUE)
 
@@ -744,13 +746,18 @@ Thinking about the 3 health percentages:
 * Percent of diabetes
 we can say that each of the percentages is the same as the probability of a randomly chosen individual in that county having the specific condition. Let us further assume that each of the events (being obese, being physically inactive, having diabetes) are independent of each other. According to probability theory, the probability of two independent events occurring is simply the product of the two individual probabilities. Therefore
 
-$$P(diabetes & obese) = P(diabetes) * P(obese)$$
-
-$$P(diabetes & physical inactivity) = P(diabetes) * P(physical_inactivity)$$
-
-$$P(obese & phyiscal inactivity) = P (obese) * P(physical_inactivity)$$
-
-$$P(obese & diabetes & physical inactivity) = P(obese) * P(diabetes) * P(phyiscal inactivity)$$
+$$
+\mbox{P}(\mbox{diabetes & obese}) = \mbox{P}(\mbox{diabetes}) * \mbox{P}(\mbox{obese)}
+$$
+$$
+\mbox{P}(\mbox{diabetes & physical inactivity}) = \mbox{P}(\mbox{diabetes}) * \mbox{P}(\mbox{physical inactivity)}
+$$
+$$
+\mbox{P}(\mbox{obese & physical inactivity}) = \mbox{P}(\mbox{obese}) * \mbox{P}(\mbox{physical inactivity)}
+$$
+$$
+\mbox{P}(\mbox{diabetes & obese & physical inactivity}) = \mbox{P}(\mbox{diabetes}) * \mbox{P}(\mbox{obese)} * \mbox{P}(\mbox{physical inactivity})
+$$
 
 By calculating these combined probabilities, we find features that have even stronger correlation that each individual feature
 ```{r}
@@ -918,11 +925,148 @@ data.frame(MIN = min(ranges[1,]), MAX = max(ranges[2,]))
 While the Scale/Z-Score transformation gives us the largest overall range of the three, the histograms show that all features are now within the same order of magnitude (while cube root and square root still have Death Rate per 1000 above 1 and all percentages below 1). We will apply the Scale transformation to the data set and then create the regression models.
 
 ```{r}
+#Categorical columns
+cat_cols <- colnames(train_data)[sapply(train_data, is.factor)]
+
 #Create new DF with the scaled data
 model_data <- cbind(train_data %>% select(heart_disease_mortality_per_100k, cat_cols),
                     sapply(train_data[num_cols], scale, simplify=TRUE))
 ```
 
-###Creating and evaluating regression models
+### Training and test sets
+Best practice is to take a random sampling of the entire data set to use as a "training set", on which to train the model, and then use the remainder as a "test set" for evaluating the robustness of the model.  We will split our data 50/50 into the 2 sets:
 
+```{r}
+set.seed(999)
+test_index <- createDataPartition(model_data$heart_disease_mortality_per_100k, 
+                                  times = 1, p=0.5, list=FALSE)
+train_set <- model_data[-test_index, ] 
+test_set <- model_data[test_index, ]
+
+```
+```{r, echo=FALSE}
+#Load the results into memory for display
+#Make sure model_results.csv is in the working directory
+results <- read.csv("model_results.csv", stringsAsFactors = FALSE)
+```
+
+
+###Creating and evaluating regression models
+Now that the data is prepared, we look at different regression models and determine their predictive power.  There are many ways to evaluate the strength of a regression model, but we have chosen to use Root Mean Squared Error:
+
+$$
+RMSE = \sqrt{\frac{1}{n} \sum_{i=1}^n \left( y_i-y \right) ^2}
+$$
+which calculated in R looks like this
+
+```{r, eval=FALSE}
+RMSE <- sqrt(mean((y_i - y)^2))
+```
+
+where ${y_i}$ is the predicted value and ${y}$ is the true value.
+
+We chose the following regression models to examine:
+
+* Linear Regression (lm)
+* Decision/Regression Tree (rpart)
+* Random Forest
++ randomForest
++ Rborist
+  
+####Linear Regression
+First we ran the "lm" linear regression model to get an RMSE for a basic algorithm
+
+```{r, eval=FALSE}
+#Linear regression model
+fit <- lm(formula = heart_disease_mortality_per_100k ~ ., data = train_set)
+y_hat <- predict(fit, test_set)
+sqrt(mean((y_hat-test_set$heart_disease_mortality_per_100k)^2))
+```
+```{r, echo=FALSE}
+results[results$method=="lm", 2]
+```
+
+####Decision/Regression Tree
+The next regression method tried was a regression tree. One method for fitting a model of this kind is to create a model where each data value is its own node then train the model such that each node improves the RMSE by a certain amount at each split. This amount is called "complexity parameter".
+
+We first run the model by training and predciting against the entire data set, then again by training against the train set and predicting against the test set.
+
+#####Full dataset
+```{r, eval=FALSE}
+#Start with complexity parameter = 0 then prune
+rt_fit <- rpart(heart_disease_mortality_per_100k ~ ., data = model_data,
+                control = rpart.control(cp=0, minsplit=2))
+
+y_hat_rt <- predict(rt_fit)
+
+#We know this is going to be 0 as each row is its own node
+sqrt(mean((y_hat_rt-model_data$heart_disease_mortality_per_100k)^2))
+```
+```{r, echo=FALSE}
+results[results$method=="Regression Tree, Full data, CP=0", 2]
+```
+
+```{r, eval=FALSE}
+#Train the complexity parameter                 
+train_rt <- train(heart_disease_mortality_per_100k ~ .,
+                  method = "rpart",
+                  tuneGrid = data.frame(cp = seq(0, 0.05, len=100)),
+                  data = model_data)
+
+bt <- as.numeric(train_rt$bestTune[which.min(train_rt$bestTune)])
+```
+```{r, echo=FALSE}
+results[results$method=="Reg Tree Full data - pruned", 3]
+```
+```{r, eval=FALSE}
+#Prune the regression tree using the best cp parameter
+rt_pruned <- prune(rt_fit, cp=bt)
+
+y_hat_pruned <- predict(rt_pruned)
+
+sqrt(mean((y_hat_pruned - model_data$heart_disease_mortality_per_100k)^2))
+```
+```{r, echo=FALSE}
+results[results$method=="Reg Tree Full data - pruned", 2]
+```
+
+
+#####Train/test sets
+```{r, eval=FALSE}
+#Start with complexity parameter = 0 then prune
+rt_fit <- rpart(heart_disease_mortality_per_100k ~ ., data = train_set,
+                control = rpart.control(cp=0, minsplit=2))
+
+y_hat_rt <- predict(rt_fit, train_set)
+
+#We know this is going to be 0 as each row is its own node
+sqrt(mean((y_hat_rt - train_set$heart_disease_mortality_per_100k)^2))
+```
+```{r, echo=FALSE}
+results[results$method=="Regression Tree, Train, CP=0", 2]
+```
+```{r, eval=FALSE}
+#Train the complexity parameter                 
+train_rt <- train(heart_disease_mortality_per_100k ~ .,
+                  method = "rpart",
+                  tuneGrid = data.frame(cp = seq(0, 0.05, len=100)),
+                  data = train_set)
+bt_train <- as.numeric(train_rt$bestTune[which.min(train_rt$bestTune)])
+```
+```{r, echo=FALSE}
+results[results$method=="Reg Tree - pruned; train/test", 3]
+```
+```{r, eval=FALSE}
+#Prune the regression tree using the best cp parameter; predict against test set
+rt_pruned <- prune(rt_fit, cp=bt_train)
+
+y_hat_pruned <- predict(rt_pruned, test_set)
+
+sqrt(mean((y_hat_pruned - test_set$heart_disease_mortality_per_100k)^2))
+```
+```{r, echo=FALSE}
+results[results$method=="Reg Tree - pruned; train/test", 2]
+```
+
+As we can see, the RMSE for the model that trains/fits the entire data set is superior to that of the train/test (and superior to the simple linear regression model), but that may be due to overfitting.
 
