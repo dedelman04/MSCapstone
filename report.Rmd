@@ -1068,5 +1068,9 @@ sqrt(mean((y_hat_pruned - test_set$heart_disease_mortality_per_100k)^2))
 results[results$method=="Reg Tree - pruned; train/test", 2]
 ```
 
-As we can see, the RMSE for the model that trains/fits the entire data set is superior to that of the train/test (and superior to the simple linear regression model), but that may be due to overfitting.
+As we can see, the RMSE for the regression tree that trains/fits the entire data set is superior to that of the train/test (and superior to the simple linear regression model), but that is likely due to overfitting.
+
+####Random Forest
+
+#####randomForest/rf
 

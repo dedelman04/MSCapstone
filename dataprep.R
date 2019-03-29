@@ -291,9 +291,13 @@ fit_rf <- train(heart_disease_mortality_per_100k ~ .,
 y_hat_rf <- predict(fit_rf, test_set)
 sqrt(mean((y_hat_rf-test_set$heart_disease_mortality_per_100k)^2))
 
+bt1 <- as.numeric(fit_rf$bestTune[1])
+bt2 <- as.numeric(fit_rf$bestTune[2])
+
 results <- rbind(results,
                  data.frame(method="trained Rborist",
-                            RMSE=sqrt(mean((y_hat_rf - test_set$heart_disease_mortality_per_100k)^2, na.rm=TRUE))))
+                            RMSE=sqrt(mean((y_hat_rf - test_set$heart_disease_mortality_per_100k)^2, na.rm=TRUE)),
+                            TrainVal=paste(paste("predFixed", bt1, sep="="), paste("minNodes", bt2, sep="="))))
 
 ##Rborist
 ###Random Forests###
@@ -304,17 +308,17 @@ results <- rbind(results,
 # randomForest -> fit_rf_full; y_hat_rf_full
 # Rborist -> fit_rf; y_hat_rf
 
-ens <- data.frame(y = test_set$heart_disease_mortality_per_100k) %>%
-  mutate(lm = y_hat, rt = y_hat_pruned, rf = y_hat_rf_full, Rborist = y_hat_rf)
+ens <- data.frame(lm = y_hat, rt = y_hat_pruned, rf = y_hat_rf_full, Rborist = y_hat_rf)
 
-ens <- ens %>% mutate(ensemble = rowMeans(select(-y)))
+ens$ensemble <- rowMeans(ens)
 
-ens_RMSE <- sqrt(mean((ens$y - ens$ensemble)^2))
+ens_RMSE <- sqrt(mean((ens$ensemble - test_set$heart_disease_mortality_per_100k)^2))
 
 results <- rbind(results,
                  data.frame(method="4 model ensemble",
                             RMSE=ens_RMSE,
                             TrainVal = "N/A")
+)
 
 #write.csv(results, "model_results.csv", row.names = FALSE)
 #results <- read.csv("model_results.csv", stringsAsFactors = FALSE)
