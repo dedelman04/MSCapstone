@@ -276,11 +276,16 @@ results <- rbind(results,
 ##randomForest
 
 ##Rborist
-#Cross validate Rborist method over minNode parameter
+#Cross validate Rborist method over minNode and predFixed parameters
 library(Rborist)
+tGrid = rbind(data.frame(predFixed=2, minNode = seq(2,50, by=2)),
+              data.frame(predFixed=3, minNode = seq(2,50, by=2)),
+              data.frame(predFixed=4, minNode = seq(2,50, by=2)),
+              data.frame(predFixed=5, minNode = seq(2,50, by=2)))
+
 fit_rf <- train(heart_disease_mortality_per_100k ~ .,
                 method="Rborist",
-                tuneGrid=data.frame(predFixed=2, minNode = seq(3,50) ),
+                tuneGrid = tGrid,
                 data=train_set)
 
 y_hat_rf <- predict(fit_rf, test_set)
@@ -292,6 +297,24 @@ results <- rbind(results,
 
 ##Rborist
 ###Random Forests###
+
+###Ensemble the 4 models together###
+# linear regression -> fit; y_hat
+# Regression Tree -> rt_pruned; y_hat_pruned
+# randomForest -> fit_rf_full; y_hat_rf_full
+# Rborist -> fit_rf; y_hat_rf
+
+ens <- data.frame(y = test_set$heart_disease_mortality_per_100k) %>%
+  mutate(lm = y_hat, rt = y_hat_pruned, rf = y_hat_rf_full, Rborist = y_hat_rf)
+
+ens <- ens %>% mutate(ensemble = rowMeans(select(-y)))
+
+ens_RMSE <- sqrt(mean((ens$y - ens$ensemble)^2))
+
+results <- rbind(results,
+                 data.frame(method="4 model ensemble",
+                            RMSE=ens_RMSE,
+                            TrainVal = "N/A")
 
 #write.csv(results, "model_results.csv", row.names = FALSE)
 #results <- read.csv("model_results.csv", stringsAsFactors = FALSE)

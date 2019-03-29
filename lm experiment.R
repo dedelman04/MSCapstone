@@ -15,7 +15,7 @@ try_lm <- function(p){
   sqrt(mean((y_hat - ts$heart_disease_mortality_per_100k)^2))
 }
 
-rsme <- replicate(1000, sapply(p, try_lm, simplify=TRUE))
+rmse <- replicate(1000, sapply(p, try_lm, simplify=TRUE))
 
-which.min(cbind(data.frame(p), data.frame(rsme=rowMeans(rsme)))[,2])
-  ggplot(aes(x=p, y=rsme))+geom_point()+geom_line()
+which.min(cbind(data.frame(p), data.frame(rsme=rowMeans(rmse)))[,2])
+  ggplot(aes(x=p, y=rmse))+geom_point()+geom_line()
