@@ -250,6 +250,9 @@ results <- rbind(results,
                             RMSE=sqrt(mean((train_rf$predicted - model_data$heart_disease_mortality_per_100k)^2)),
                             TrainVal = "N/A"))
 
+sqrt(mean((train_rf$predicted - model_data$heart_disease_mortality_per_100k)^2))
+sqrt(mean((predict(train_rf) - model_data$heart_disease_mortality_per_100k)^2))
+
 #Simple random forest with train/test set
 train_rf_full <- randomForest(x=train_set[model_cols],
                               y=train_set$heart_disease_mortality_per_100k,
@@ -268,6 +271,9 @@ fit_rf_full <- train(method="rf",
                      tuneGrid = data.frame(mtry = seq(1,11)))
 
 y_hat_rf_full <- predict(fit_rf_full$finalModel, test_set)
+
+sqrt(mean((y_hat_rf_full - test_set$heart_disease_mortality_per_100k)^2, na.rm=TRUE))
+sqrt(mean((predict(fit_rf_full, test_set) - test_set$heart_disease_mortality_per_100k)^2, na.rm=TRUE))
 
 results <- rbind(results, 
                  data.frame(method="randomForest trained",

@@ -1071,6 +1071,93 @@ results[results$method=="Reg Tree - pruned; train/test", 2]
 As we can see, the RMSE for the regression tree that trains/fits the entire data set is superior to that of the train/test (and superior to the simple linear regression model), but that is likely due to overfitting.
 
 ####Random Forest
-
 #####randomForest/rf
+For the first attempt using a random forest prediction algorithm, we will apply the "randomForest" package against the entire dataset.
 
+```{r, eval=FALSE}
+library(randomForest)
+train_rf <- randomForest(heart_disease_mortality_per_100k ~ ., data=model_data)
+
+sqrt(mean((train_rf$predicted - model_data$heart_disease_mortality_per_100k)^2))
+```
+```{r, echo=FALSE}
+results[results$method=="randomForest", 2]
+```
+
+This is the best RMSE so far, but since the model was fitted over the entire dataset, it is likely to suffer from overfitting when run against an unknown dataset.
+
+We the run the same package, but this time with our train dataset, then preditcing against the test set.
+
+```{r, eval=FALSE}
+train_rf_full <- randomForest(x=train_set[model_cols],
+                              y=train_set$heart_disease_mortality_per_100k,
+                              xtest = test_set[model_cols]
+                              )
+sqrt(mean((train_rf_full$test$predicted - test_set$heart_disease_mortality_per_100k)^2))
+```
+```{r, echo=FALSE}
+results[results$method=="randomForest, train/test", 2]
+```
+
+As expected, the RMSE is a little higher than the forest fit against the entire dataset.
+
+The tuning parameter available in the caret package for the randomForest algorithm (method="rf") is the mtry parameter, which specifies how many predictors are randomly selected as candidates at each split of the tree. We will train the rf model over mtry values from 1 thru 11.
+
+```{r, eval=FALSE}
+fit_rf_full <- train(method="rf",
+                     x=train_set[model_cols],
+                     y=train_set$heart_disease_mortality_per_100k,
+                     tuneGrid = data.frame(mtry = seq(1,11)))
+
+y_hat_rf_full <- predict(fit_rf_full$finalModel, test_set)
+
+sqrt(mean((y_hat_rf_full - test_set$heart_disease_mortality_per_100k)^2, na.rm=TRUE))
+```
+```{r, echo=FALSE}
+results[results$method=="randomForest trained", 2]
+```
+```{r, eval=FALSE}
+fit_rf_full$bestTune$mtry
+```
+```{r, echo=FALSE}
+results[results$method=="randomForest trained", 3]
+```
+
+The trained randomForest with an mtry parameter of 2 has very little difference from the untrained randomForest (which by default has a mtry parameter of ${floor(\frac{ncol(train\_set)}{3}) = 4}$)
+
+#####Rborist
+Another random forest algorithm that can be trained with the caret package is Rborist. It has 2 tunable parameters:
+
+* predFixed - the number of predictors to randomly select at each split
+* minNodes - the mininmum number of members (size) of each final node
+
+We will just train Rborist against the train and test sets, since we have seen in all cases that we are liklely introducing overfitting when using the entire dataset to predict. We will use ranges of predFixed from 1 thru 4, and minNodes as even numbers from 2 thru 50. 
+
+```{r, eval=FALSE}
+library(Rborist)
+tGrid = rbind(data.frame(predFixed=2, minNode = seq(2,50, by=2)),
+              data.frame(predFixed=3, minNode = seq(2,50, by=2)),
+              data.frame(predFixed=4, minNode = seq(2,50, by=2)),
+              data.frame(predFixed=5, minNode = seq(2,50, by=2)))
+
+fit_rf <- train(heart_disease_mortality_per_100k ~ .,
+                method="Rborist",
+                tuneGrid = tGrid,
+                data=train_set)
+
+y_hat_rf <- predict(fit_rf, test_set)
+sqrt(mean((y_hat_rf-test_set$heart_disease_mortality_per_100k)^2))
+```
+```{r, echo=FALSE}
+results[results$method=="trained Rborist", 2]
+```
+```{r, eval=FALSE}
+fit_rf$bestTune
+```
+```{r, echo=FALSE}
+results[results$method=="trained Rborist", 3]
+```
+
+With 4 randomly selected predictors and a minimum node size of 2, we get a RMSE slightly worse than the randomForest algorithm.
+
+####Ensemble method
