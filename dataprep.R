@@ -308,6 +308,7 @@ results <- rbind(results,
 ##Rborist
 ###Random Forests###
 
+##Ensembles##
 ###Ensemble the 4 models together###
 # linear regression -> fit; y_hat
 # Regression Tree -> rt_pruned; y_hat_pruned
@@ -323,6 +324,31 @@ ens_RMSE <- sqrt(mean((ens$ensemble - test_set$heart_disease_mortality_per_100k)
 results <- rbind(results,
                  data.frame(method="4 model ensemble",
                             RMSE=ens_RMSE,
+                            TrainVal = "N/A")
+)
+##4 models
+
+##Ensemble top 3 RMSE trained models (lm, rf, Rborist)
+ens3 <- data.frame(lm = y_hat, rf = y_hat_rf_full, Rborist = y_hat_rf)
+ens3$ensemble=rowMeans(ens3)
+ens3_RMSE <- sqrt(mean((ens3$ensemble - test_set$heart_disease_mortality_per_100k)^2))
+
+results <- rbind(results,
+                 data.frame(method="3 model (lm, rf, Rbor) ensemble",
+                            RMSE=ens3_RMSE,
+                            TrainVal = "N/A")
+)
+
+##Ensemble the trained random forest models
+ens_rf <- data.frame(rf = y_hat_rf_full, Rborist = y_hat_rf)
+
+ens_rf$ensemble=rowMeans(ens_rf)
+
+ens_rf_RMSE <- sqrt(mean((ens_rf$ensemble - test_set$heart_disease_mortality_per_100k)^2))
+
+results <- rbind(results,
+                 data.frame(method="random forest ensemble",
+                            RMSE=ens_rf_RMSE,
                             TrainVal = "N/A")
 )
 

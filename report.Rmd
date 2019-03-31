@@ -2,7 +2,9 @@
 title: "Predicting Heart Disease Mortality"
 author: "David Edelman"
 date: "February 28, 2019"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -1161,3 +1163,72 @@ results[results$method=="trained Rborist", 3]
 With 4 randomly selected predictors and a minimum node size of 2, we get a RMSE slightly worse than the randomForest algorithm.
 
 ####Ensemble method
+By averaging the predictions of multiple models, we may be able to get better predictive power than any one model. To see if this is the case with our dataset, we will use the results of 4 models:
+
+* linear regression
+* Regression Tree (pruned off of train_set)
+* randomForest (mtry = 2)
+* Rborist (predFixed = 4; minNodes = 2)
+
+```{r, eval=FALSE}
+#Put all predictions together
+ens <- data.frame(lm = y_hat, rt = y_hat_pruned, rf = y_hat_rf_full, Rborist = y_hat_rf)
+
+#Get the mean predicted value across 4 models
+ens$ensemble <- rowMeans(ens)
+
+#Calculate RMSE
+ens_RMSE <- sqrt(mean((ens$ensemble - test_set$heart_disease_mortality_per_100k)^2))
+```
+```{r, echo=FALSE}
+results[results$method=="4 model ensemble", 2]
+```
+
+The results of the 4-model ensemble shows an RMSE lower than the linear regression and regression tree models, but higher than both of the random forest models. We will remove the constituent model with the highest RMSE (regression tree) and run an ensemble for the remaining 3.
+
+```{r, eval=FALSE}
+ens3 <- data.frame(lm = y_hat, rf = y_hat_rf_full, Rborist = y_hat_rf)
+
+ens3$ensemble=rowMeans(ens3)
+
+sqrt(mean((ens3$ensemble - test_set$heart_disease_mortality_per_100k)^2))
+```
+```{r, echo=FALSE}
+results[results$method=="3 model (lm, rf, Rbor) ensemble", 2]
+```
+
+The 3-model ensemble RMSE is still higher than the rf model. One final ensemble to look at would be using just the 2 trained random forest models.
+
+```{r, eval=FALSE}
+ens_rf <- data.frame(rf = y_hat_rf_full, Rborist = y_hat_rf)
+
+ens_rf$ensemble=rowMeans(ens_rf)
+
+ens_rf_RMSE <- sqrt(mean((ens_rf$ensemble - test_set$heart_disease_mortality_per_100k)^2))
+```
+```{r, echo=FALSE}
+results[results$method=="random forest ensemble", 2]
+```
+
+The RMSE for the mean prediction in our random forest models is in between the RMSEs of the two consituent models. This suggests that the nodes within each forest are fairly similar, and our predictive power does not increase by using multiple sets of predictions.
+
+###Summary of modelling
+```{r, echo=FALSE}
+results[c(1,5,7,9:12), ] %>% arrange(RMSE)
+```
+
+##Conclusions
+Predicting heart disease mortality rate is a challenging endeavor, as there are many “environmental” (i.e., not necessarily specific to an individual such as genetics) factors that can affect the outcome. Within the given data set, we see that heart disease mortality can be predicted reasonably well using a trained *randomForest* model using the following features:
+
+* Economic Typology
+* Population
+* Air Pollution concentration
+* Percent of Civilian Labor
+* Percent non-Hispanic African American
+* Death Rate per 1,000
+* Percent of adults with less than a High School diploma
+* Percent of adults with Bachelor’s Degree or higher
+* Percent of adults that are obese and have diabetes
+* Percent of adults that are obese and are physically inactive
+* Percent of adults that have diabetes and are physically inactive
+* Percent of adults that are obese, have diabetes and are physically inactive

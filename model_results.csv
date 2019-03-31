@@ -9,3 +9,5 @@
 "randomForest, train/test",33.4975374405466,"N/A"
 "trained Rborist",34.3222210337678,"predFixed=4 minNodes=2"
 "4 model ensemble",34.9318738664448,"N/A"
+"3 model (lm, rf, Rbor) ensemble",34.2160261055497,"N/A"
+"random forest ensemble",33.895900737917,"N/A"
