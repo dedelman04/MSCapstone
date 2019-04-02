@@ -1,10 +1,10 @@
 ---
 title: "Predicting Heart Disease Mortality"
 author: "David Edelman"
-date: "February 28, 2019"
+date: "April 2, 2019"
 output:
-  word_document: default
   pdf_document: default
+  word_document: default
   html_document: default
 ---
 
@@ -126,15 +126,16 @@ NAs <- data.frame(
 ) 
 
 #Show NA percentage from highest to lowest
-NAs %>% arrange(desc(NA_pct))
+NAs %>% arrange(desc(NA_pct)) %>% grid.table()
 ```
 
 We will remove predictors from the data set that have more than 10% missing values. This turns out to be
 
-*health__homicides_per_100k
-*health__pct_excessive_drinking
-*health__pct_adult_smoking
-*health__motor_vehicle_crash_deaths_per_100k
+* health__homicides_per_100k
+* health__pct_excessive_drinking
+* health__pct_adult_smoking
+* health__motor_vehicle_crash_deaths_per_100k
+
 
 ```{r}
 #Remove high NA features
@@ -154,7 +155,7 @@ min_missing <- min(NAs %>% filter(NA_pct > 0) %>% select(NA_pct))
 NA2 <- sapply(train_data %>% 
         select(as.vector(NAs$features[NAs$NA_pct == min_missing])),
        function(x){which(is.na(x))}, simplify=TRUE)
-t(NA2)
+t(NA2) %>% grid.table()
 ```
 
 We see that index 1090 and 1251 are missing all of the selected predictors, so we will remove them from the data set
@@ -260,7 +261,6 @@ train_data %>% ggplot(aes(x=heart_disease_mortality_per_100k))+
 
 However, we can transform them into population groups as a proxy for Area_RUCC. The transformation is 
 
---maybe stuff with knitr or gridextra instead--
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
 #Show area_rucc level mapping to population
 lvl <- levels(train_data$area__rucc)
@@ -443,7 +443,7 @@ There are 3 features that have not yet been handled that all have an NA percenta
 ```{r}
 #Which features have a NA % between 1 and 10
 na_mid <- NAs[NAs$NA_pct > 1 & NAs$NA_pct < 10, ]
-na_mid %>% arrange(desc(NA_pct))
+na_mid %>% arrange(desc(NA_pct)) %>% grid.table()
 ```
 
 We examine the distributions of these continuous features, showing the mean and median, to determine how best to handle the NAs
@@ -750,16 +750,16 @@ Thinking about the 3 health percentages:
 we can say that each of the percentages is the same as the probability of a randomly chosen individual in that county having the specific condition. Let us further assume that each of the events (being obese, being physically inactive, having diabetes) are independent of each other. According to probability theory, the probability of two independent events occurring is simply the product of the two individual probabilities. Therefore
 
 $$
-\mbox{P}(\mbox{diabetes & obese}) = \mbox{P}(\mbox{diabetes}) * \mbox{P}(\mbox{obese)}
+\mbox{P}(\mbox{diabetes and obese}) = \mbox{P}(\mbox{diabetes}) * \mbox{P}(\mbox{obese)}
 $$
 $$
-\mbox{P}(\mbox{diabetes & physical inactivity}) = \mbox{P}(\mbox{diabetes}) * \mbox{P}(\mbox{physical inactivity)}
+\mbox{P}(\mbox{diabetes and physical inactivity}) = \mbox{P}(\mbox{diabetes}) * \mbox{P}(\mbox{physical inactivity)}
 $$
 $$
-\mbox{P}(\mbox{obese & physical inactivity}) = \mbox{P}(\mbox{obese}) * \mbox{P}(\mbox{physical inactivity)}
+\mbox{P}(\mbox{obese and physical inactivity}) = \mbox{P}(\mbox{obese}) * \mbox{P}(\mbox{physical inactivity)}
 $$
 $$
-\mbox{P}(\mbox{diabetes & obese & physical inactivity}) = \mbox{P}(\mbox{diabetes}) * \mbox{P}(\mbox{obese)} * \mbox{P}(\mbox{physical inactivity})
+\mbox{P}(\mbox{diabetes and obese and physical inactivity}) = \mbox{P}(\mbox{diabetes}) * \mbox{P}(\mbox{obese)} * \mbox{P}(\mbox{physical inactivity})
 $$
 
 By calculating these combined probabilities, we find features that have even stronger correlation that each individual feature
@@ -1215,7 +1215,7 @@ The RMSE for the mean prediction in our random forest models is in between the R
 
 ###Summary of modelling
 ```{r, echo=FALSE}
-results[c(1,5,7,9:12), ] %>% arrange(RMSE)
+results[c(1,5,7,9:12), ] %>% arrange(RMSE) %>% grid.table()
 ```
 
 ##Conclusions
