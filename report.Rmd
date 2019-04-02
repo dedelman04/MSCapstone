@@ -3,9 +3,9 @@ title: "Predicting Heart Disease Mortality"
 author: "David Edelman"
 date: "April 2, 2019"
 output:
-  pdf_document: default
-  word_document: default
   html_document: default
+  word_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -517,60 +517,6 @@ data.frame(
   ) %>% arrange(desc(abs(corr)))
 
 ```
-```{r, echo=FALSE, eval=FALSE}
-corr <- data.frame()
-for (i in 1:length(cols)) {
-  corr[cols[i],1] <- round(cor(data.frame(train_data$heart_disease_mortality_per_100k,
-                              train_data[,cols[i]]),
-                   use="complete.obs")[1,2],3)
-}
-
-corr <- cbind(cols, corr)
-colnames(corr) <- c("type", "cor")
-corr <- corr %>% mutate(type = substr(type, 7, 100)) %>% arrange(desc(abs(cor)))
-
-corr %>% grid.table()
-
-
-```
-
-```{r, eval=FALSE, echo=FALSE}
-#Correlation among econ stats
-cname <- colnames(train_data)
-cname <- cname[like(cname,"econ__pct")]
-
-par(mfrow=c(2,2))
-
-p = list()
-
-for (i in 1:length(cname)) {
-
-  #Determine correlation with default method
-  cor <- round(cor(data.frame(train_data$heart_disease_mortality_per_100k,
-                              train_data[,cname[i]]),
-                   use="complete.obs")[1,2],3)
-  cor <- paste("corr =", as.character(cor))
-  
-  #Plot econ factor vs mortality
-    dplot <- ggplot(train_data, 
-                  aes_string(y="heart_disease_mortality_per_100k",
-                             x=cname[i]))+
-    ylab("hrt_mort")+
-    xlab(substr(cname[i], 7, 100))+
-    xlim(0,max(train_data[cname[i]], na.rm=TRUE)+.05)
-    
-    if(cname[i]=="econ__pct_civilian_labor") {
-      dplot <- dplot + theme(plot.background = element_rect(colour = "black", fill=NA, size=2))
-    }
-
-
-  p[[i]] <- dplot+geom_point(na.rm=TRUE)+
-    geom_smooth(method="lm", se=TRUE, na.rm=TRUE)+
-    annotate("text", x=max(train_data[cname[i]],na.rm=TRUE), y=500, label= cor, size=3)
-}
-
-do.call(grid.arrange, p)
-```
 
 As seen above, **“Percent of Civilian Labor”** shows a moderate negative correlation with heart disease mortality (despite the number of outliers appearing to be greater than the other factors) and is a good candidate for use in a predictive model.  The remaining factors do not show a strong enough correlation ( >= 0.45) to be considered good candidates.
 
@@ -579,7 +525,7 @@ The dataset contains 12 demographic features that are reported as percentages of
 
 ```{r}
 cols <- colnames(train_data)[like(colnames(train_data), "demo__")] 
-ncol <- ifelse(length(cols) <= 6, 2, 3)
+ncol <- 4
 
 train_data %>% select(heart_disease_mortality_per_100k, cols) %>%
   gather(data_type, val, -heart_disease_mortality_per_100k) %>%
@@ -595,60 +541,6 @@ data.frame(
         use="complete.obs")[1,2] })
   ) %>% arrange(desc(abs(corr)))
 
-```
-```{r, echo=FALSE, eval=FALSE}
-corr <- data.frame()
-for (i in 1:length(cols)) {
-  corr[cols[i],1] <- round(cor(data.frame(train_data$heart_disease_mortality_per_100k,
-                              train_data[,cols[i]]),
-                   use="complete.obs")[1,2],3)
-}
-
-corr <- cbind(cols, corr)
-colnames(corr) <- c("type", "cor")
-corr <- corr %>% mutate(type = substr(type, 7, 100)) %>% arrange(desc(abs(cor)))
-
-corr %>% grid.table()
-
-```
-
-
-```{r, echo=FALSE, eval=FALSE}
-#Correlation among demo stats
-cname <- colnames(train_data)
-cname <- cname[like(cname,"demo_")]
-cname <- cname[!like(cname, "_1k")]
-
-par(mfrow=c(3,4))
-
-p = list()
-
-for (i in 1:length(cname)) {
-  #Determine correlation with default method
-    cor <- round(cor(data.frame(train_data$heart_disease_mortality_per_100k,
-                              train_data[,cname[i]]),
-                   use="complete.obs")[1,2],3)
-  cor <- paste("corr =", as.character(cor))
-
-  #Plot demo vs mortality
-  dplot <- ggplot(train_data, 
-                  aes_string(y="heart_disease_mortality_per_100k",
-                             x=cname[i]))+
-                    ylab("hrt_mort")+
-                    xlab(substr(cname[i], 11, 100)) #+
-                    #xlim(0,1)
-  if(cname[i] %in% c("demo__pct_non_hispanic_african_american",
-                     "demo__pct_adults_less_than_a_high_school_diploma",
-                     "demo__pct_adults_bachelors_or_higher")) {
-      dplot <- dplot + theme(plot.background = element_rect(colour = "black", fill=NA, size=2))
-  }
-
-  p[[i]] <- dplot+geom_point(na.rm=TRUE)+
-    geom_smooth(method="lm", se=TRUE, na.rm=TRUE)+
-    annotate("text", x=.9, y=500, label= cor, size=2.5)+xlim(0, 1)
-}
-
-do.call(grid.arrange, p)
 ```
 
 Analysis of the correlation scatter plots showed that there were several candidates for model features. **“Percent of non-Hispanic African Americans”** was chosen as it had the strongest correlation in the subset of race/ethnicity demographics, even though its actual correlation was only moderate ( < .45 ).  **“Adults with less than a High School diploma”** and **“Adults with a Bachelor’s Degree or higher”** were chosen for their strong positive and negative correlations, respectively.  **"Death Rate per 1000"** also showed a high-moderate correlation.
@@ -682,60 +574,6 @@ data.frame(
         use="complete.obs")[1,2] })
   ) %>% arrange(desc(abs(corr)))
 
-```
-```{r, echo=FALSE, eval=FALSE}
-corr <- data.frame()
-for (i in 1:length(cols)) {
-  corr[cols[i],1] <- round(cor(data.frame(train_data$heart_disease_mortality_per_100k,
-                              train_data[,cols[i]]),
-                   use="complete.obs")[1,2],3)
-}
-
-corr <- cbind(cols, corr)
-colnames(corr) <- c("type", "cor")
-corr <- corr %>% mutate(type = substr(type, 9, 100)) %>% arrange(desc(abs(cor)))
-
-corr %>% grid.table()
-```
-
-```{r, eval=FALSE, echo=FALSE}
-#Correlation among health stats
-cname <- colnames(train_data)
-cname <- cname[like(cname,"health__pct")]
-#cname <- cname[!like(cname, "_1k")]
-
-par(mfrow=c(4,3))
-
-p = list()
-
-for (i in 1:length(cname)) {
-  #Calculate correlation between health pct and mortality
-  cor <- round(cor(data.frame(train_data$heart_disease_mortality_per_100k,
-                        train_data[,cname[i]]),
-             use="complete.obs")[1,2],3)
-  cor <- paste("corr =", as.character(cor))
-
-  #Scatter plot
-    dplot <- ggplot(train_data,
-                  aes_string(y="heart_disease_mortality_per_100k",
-                             x=cname[i]))+
-    ylab("hrt_mort")+
-    xlab(substr(cname[i], 9, 100))+
-    xlim(0,.6)
-  
-  if(cname[i] %in% c("health__pct_adult_obesity",
-                     "health__pct_adult_smoking",
-                     "health__pct_diabetes",
-                     "health__pct_physical_inacticity")) {
-      dplot <- dplot + theme(plot.background = element_rect(colour = "black", fill=NA, size=2))
-  }
-
-  p[[i]] <- dplot+geom_point(na.rm=TRUE)+
-    geom_smooth(method="lm", se=TRUE, na.rm=TRUE)+
-    annotate("text", x=.5, y=500, label= cor, size=3.5)
-}
-
-do.call(grid.arrange, p)
 ```
 
 The 2 features related to medical professionals did not show a strong correlation ( > 0.45) to heart disease mortality rate, so they were not considered for the predictive model.
@@ -796,20 +634,6 @@ data.frame(
         use="complete.obs")[1,2] })
   ) %>% arrange(desc(abs(corr)))
 
-```
-```{r, echo=FALSE, eval=FALSE}
-corr <- data.frame()
-for (i in 1:length(cols)) {
-  corr[cols[i],1] <- round(cor(data.frame(train_data$heart_disease_mortality_per_100k,
-                              train_data[,cols[i]]),
-                   use="complete.obs")[1,2],3)
-}
-
-corr <- cbind(cols, corr)
-colnames(corr) <- c("type", "cor")
-corr <- corr %>% mutate(type = substr(type, 3, 100)) %>% arrange(desc(abs(cor)))
-
-corr %>% grid.table()
 ```
 
 All of the combinations had a correlation higher than any one individual feature, so we will use these combined probabilities in the predictive model.
